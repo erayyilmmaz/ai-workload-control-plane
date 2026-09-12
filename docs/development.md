@@ -1,9 +1,11 @@
-# Local development — API contract stage
+# Local development — reconciliation foundation stage
 
 This checkout contains a real, buildable Kubebuilder scaffold. It is **not yet a
-workload operator**: spec/status and validation are defined, but reconciliation only reads the primary, and
-no Deployment/Service/ServiceAccount/NetworkPolicy or status is produced. Never
-use the contract samples as an application deployment. AWCP-5 adds reconciliation next.
+workload operator**: API validation and the reconciliation engine work, but the
+shipped manager has no production builder yet. Samples produce no children or
+workload status. Tests inject a minimal four-kind plan to prove ownership, no-op,
+drift, watches and restart. Never use contract samples as an application deployment.
+AWCP-6 begins production field mappings.
 
 ## Prerequisites and first setup
 
@@ -44,13 +46,13 @@ cached module archives, so **bootstrap itself is not an offline workflow**.
 | Command | Purpose |
 | --- | --- |
 | `make generate` | Generate API DeepCopy methods from authored types |
-| `make manifests` | Generate structural CRD and read-only namespaced controller Role |
+| `make manifests` | Generate structural CRD and bounded namespaced controller Role |
 | `make verify-generated` | Regenerate and compare CRD, Role and DeepCopy byte-for-byte |
 | `make build` | Compile `bin/manager`, without contacting a Kubernetes cluster |
 | `make vet` / `make lint` | Go vet, selected static linters and formatting checks |
 | `make fmt` / `make lint-fix` | Explicit formatting/fix commands (mutate source) |
 | `make test-unit` | Fast `-short` tests; envtest is explicitly skipped |
-| `make test-envtest` | Manager integration plus controller-independent API contract suite |
+| `make test-envtest` | Manager integration, API contract and reconciliation/watch suites |
 | `make test` | Full `go test -count=1 ./...`, including envtest |
 | `make test-race` | Full tests with Go race detector |
 | `make render` | Validate Kustomize references and write ignored `dist/install.yaml` |
@@ -92,19 +94,26 @@ failure rather than retrying a failed shutdown away.
   fails closed, and Forbidden/transient API errors are preserved for runtime retry.
 - Manager unit cases: empty/multiple/malformed namespaces are rejected; readiness
   is false before startup and after shutdown and requires leader-scoped startup.
-- Manifest cases: namespaced CRD/status subresource, minimal read-only Role,
+- AWCP-5 controller cases: four-kind create/patch/no-op, write counts, foreign/stale
+  owners, optional deletes, concurrent patch/create/delete races, safe error
+  categories, bounded failure status/events, parent predicate and Secret index.
+- Manifest cases: namespaced CRD/status subresource, exact bounded Role,
   single-replica manager, restricted security, probes, namespace settings, pinned images.
 - Envtest: actual CRD registration, namespaced create/status round-trip, cache
   visibility and exclusion, a Lease in the manager namespace, graceful shutdown.
 - AWCP-4 contract envtest (no AWCP manager): defaults, zero/false preservation,
   quantity CEL, valid/invalid fixtures, Strict vs pruning, status/spec isolation,
   generation behavior, kubectl explain and server printer columns.
+- AWCP-5 reconciliation envtest: real server defaults, Service IP and injected
+  sidecar preservation, four-kind drift/delete watches, status/Secret events,
+  stable resourceVersions, failure isolation, Events and manager restart.
 - Kind smoke: image UID 65532, restricted runtime security, real health/readiness,
-  manager rollout, leadership and positive/negative bootstrap authorization.
+  manager rollout, leadership and positive/negative foundation authorization.
 
 Envtest uses an administrator test client; it does not prove runtime RBAC.
-Kind smoke checks only this read-only bootstrap's Role. Neither layer proves
-workload rollout, garbage collection, Secret recovery, NetworkPolicy enforcement,
+Kind smoke checks the foundation Role with the shipped manager (nil builder),
+not the test-only plans. Neither layer proves application rollout, garbage
+collection, complete Secret dependency recovery, NetworkPolicy enforcement,
 multi-replica leader failover or telemetry. Those belong to later stories.
 
 ## Container and isolated smoke
@@ -146,7 +155,8 @@ Safe packaging/install/uninstall workflows are AWCP-15's deliverable.
 | `PROJECT` | Kubebuilder CLI metadata; retain actual module/API identity |
 | `api/v1alpha1/*_types.go`, `groupversion_info.go` | Initially scaffolded, now project-owned source |
 | `cmd`, `internal`, `test`, other `config` files, Dockerfile/Makefile | Project-owned bootstrap adaptations with tests |
-| `internal/resource`, `internal/telemetry` | Documented package boundaries, not implemented features |
+| `internal/resource` | Builder/Intent contract and naming; production mappings pending |
+| `internal/telemetry` | Reserved boundary; not an implemented feature |
 | `docs/backlog/*` | Original dated planning snapshot, not a live status board |
 
 Scaffold provenance: checksum-verified Kubebuilder v4.15.0, go/v4, generated in a

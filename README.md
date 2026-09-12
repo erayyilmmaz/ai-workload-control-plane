@@ -2,7 +2,7 @@
 
 A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
 
-**Stage: API contract (AWCP-4). The typed API and validation work; workload behavior is not implemented yet.**
+**Stage: reconciliation foundation (AWCP-5). The API, ownership engine and watches are tested; production workload mappings start in AWCP-6.**
 
 An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
 
@@ -55,13 +55,17 @@ This is an alpha portfolio project, not a production-ready platform. An `AIWorkl
 AWCP-2 defines the intended resource contract; AWCP-3 adds the Kubebuilder project,
 read-only controller, namespace-scoped manager, local tooling, tests and container.
 AWCP-4 defines typed spec/status, API-server defaults and schema/CEL validation.
-No child resources or workload
-status are produced. Metrics, application lifecycle E2E, hosted CI and releases
+AWCP-5 adds deterministic plans, guarded create/patch/delete/no-op, child watches,
+Secret metadata indexing, failure conditions/events and retry semantics. Tests
+inject minimal four-kind builders. The shipped manager intentionally has no
+production builder yet, so samples still produce no children or workload status.
+Metrics, application lifecycle E2E, hosted CI and releases
 remain future work. See [AWCP-2 design evidence](docs/verification/AWCP-2.md) and
 [AWCP-3 execution evidence](docs/verification/AWCP-3.md) and
-[AWCP-4 contract evidence](docs/verification/AWCP-4.md).
+[AWCP-4 contract evidence](docs/verification/AWCP-4.md) and
+[AWCP-5 foundation evidence](docs/verification/AWCP-5.md).
 
-The next milestone is AWCP-5 — reconciliation foundation and ownership.
+The next milestone is AWCP-6 — Deployment reconciliation and workload lifecycle.
 Each completed development step is validated, committed and pushed before moving on.
 
 The [original Jira backlog export](docs/backlog/awcp-v0.md) is a dated planning snapshot. Current architecture documents and the version lock supersede its provisional choices; corrections are listed in the compatibility document.

@@ -20,6 +20,7 @@ import (
 
 	platformv1alpha1 "github.com/erayyilmmaz/ai-workload-control-plane/api/v1alpha1"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/controller"
+	"github.com/erayyilmmaz/ai-workload-control-plane/internal/resource"
 )
 
 // Options are explicit so out-of-cluster runs cannot silently expand scope.
@@ -28,6 +29,10 @@ type Options struct {
 	ManagerNamespace string
 	ProbeAddress     string
 	LeaderElection   bool
+	// ControllerName defaults to aiworkload; tests use unique names for sequential managers.
+	ControllerName string
+	// Builder is an internal composition point; nil until production mappings land.
+	Builder resource.Builder
 }
 
 // Validate requires exactly one DNS-label namespace for each purpose.
@@ -71,7 +76,7 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 		return nil, err
 	}
 	if err = (&controller.AIWorkloadReconciler{
-		Client: mgr.GetClient(), WatchNamespace: options.WatchNamespace,
+		Client: mgr.GetClient(), WatchNamespace: options.WatchNamespace, Builder: options.Builder, ControllerName: options.ControllerName,
 	}).SetupWithManager(mgr); err != nil {
 		return nil, err
 	}

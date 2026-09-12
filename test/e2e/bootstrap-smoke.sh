@@ -41,7 +41,13 @@ created=true
 "$kubectl" apply -f dist/install.yaml
 "$kubectl" -n awcp-system set image deployment/awcp-controller-manager "manager=$image"
 "$kubectl" -n awcp-system rollout status deployment/awcp-controller-manager --timeout=180s
-pod="$("$kubectl" -n awcp-system get pod -l app.kubernetes.io/name=awcp-controller-manager -o jsonpath='{.items[0].metadata.name}')"
+# A completed rollout may still list the old terminating Pod. Select the Ready
+# Pod for the requested image, never the first item returned by the API.
+pod="$("$kubectl" -n awcp-system get pod -l app.kubernetes.io/name=awcp-controller-manager -o json | jq -er --arg image "$image" '
+  [.items[] | select(.metadata.deletionTimestamp == null)
+   | select(any(.spec.containers[]; .name == "manager" and .image == $image))
+   | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))]
+  | if length == 1 then .[0].metadata.name else error("expected one Ready manager Pod for the requested image") end')"
 "$kubectl" -n awcp-system get pod "$pod" -o json | jq -e '
   .spec.securityContext.runAsUser == 65532 and
   .spec.securityContext.runAsNonRoot == true and
@@ -58,7 +64,12 @@ done
 "$kubectl" apply -f config/samples/platform_v1alpha1_aiworkload.yaml
 identity=system:serviceaccount:awcp-system:awcp-controller-manager
 test "$("$kubectl" auth can-i get aiworkloads.platform.example.io -n awcp-workloads --as="$identity")" = yes
-for rule in 'get secrets' 'create deployments.apps' 'update aiworkloads.platform.example.io'; do
+for rule in 'get secrets' 'create deployments.apps' 'create events.events.k8s.io'; do
+  # Intentional splitting of resource/verb pairs.
+  test "$("$kubectl" auth can-i $rule -n awcp-workloads --as="$identity")" = yes
+done
+test "$("$kubectl" auth can-i patch aiworkloads.platform.example.io --subresource=status -n awcp-workloads --as="$identity")" = yes
+for rule in 'create secrets' 'delete deployments.apps' 'delete serviceaccounts' 'update aiworkloads.platform.example.io'; do
   # Word splitting intentionally supplies verb/resource from these fixed cases.
   answer="$("$kubectl" auth can-i $rule -n awcp-workloads --as="$identity" || true)"
   test "$answer" = no
@@ -66,4 +77,4 @@ done
 answer="$("$kubectl" auth can-i get aiworkloads.platform.example.io -n default --as="$identity" || true)"
 test "$answer" = no
 "$kubectl" -n awcp-system logs deployment/awcp-controller-manager --tail=30
-echo 'PASS: container UID, restricted security, health/readiness, Lease and bootstrap RBAC'
+echo 'PASS: container UID, restricted security, health/readiness, Lease and foundation RBAC'

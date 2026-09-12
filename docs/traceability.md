@@ -28,7 +28,9 @@ AWCP-3's repository foundation is now implemented; see its
 [acceptance and execution evidence](verification/AWCP-3.md) and
 [development guide](development.md).
 [AWCP-4](verification/AWCP-4.md) now implements the API schema and contract tests;
-AWCP-5 onward remain planned.
+[AWCP-5](verification/AWCP-5.md) implements the reconciliation/ownership engine and
+watch wiring with injected test builders. Production mappings and full observed
+readiness remain AWCP-6 onward; the default manager creates no children yet.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |

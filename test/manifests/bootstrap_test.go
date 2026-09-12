@@ -67,12 +67,29 @@ func TestManagerSecurity(t *testing.T) {
 func TestGeneratedRBACAndCRD(t *testing.T) {
 	var role rbacv1.Role
 	readYAML(t, "config/rbac/role.yaml", &role)
-	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 1 {
+	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 8 {
 		t.Fatalf("unexpected runtime role: %+v", role)
 	}
-	rule := role.Rules[0]
-	if strings.Join(rule.APIGroups, ",") != "platform.example.io" || strings.Join(rule.Resources, ",") != "aiworkloads" || strings.Join(rule.Verbs, ",") != "get,list,watch" {
-		t.Fatalf("bootstrap must be read-only: %+v", rule)
+	want := map[string]string{
+		"/secrets":                               "get,list,watch",
+		"/serviceaccounts":                       "create,get,list,patch,update,watch",
+		"/services":                              "create,delete,get,list,patch,update,watch",
+		"apps/deployments":                       "create,get,list,patch,update,watch",
+		"networking.k8s.io/networkpolicies":      "create,delete,get,list,patch,update,watch",
+		"events.k8s.io/events":                   "create,patch,update",
+		"platform.example.io/aiworkloads":        "get,list,watch",
+		"platform.example.io/aiworkloads/status": "patch,update",
+	}
+	for _, rule := range role.Rules {
+		key := strings.Join(rule.APIGroups, ",") + "/" + strings.Join(rule.Resources, ",")
+		verbs, ok := want[key]
+		if !ok || strings.Join(rule.Verbs, ",") != verbs || len(rule.ResourceNames) != 0 || len(rule.NonResourceURLs) != 0 {
+			t.Fatalf("unexpected permissions: %+v", rule)
+		}
+		delete(want, key)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing permissions: %v", want)
 	}
 	var crd apiextensionsv1.CustomResourceDefinition
 	readYAML(t, "config/crd/bases/platform.example.io_aiworkloads.yaml", &crd)

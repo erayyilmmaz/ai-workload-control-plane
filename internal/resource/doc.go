@@ -1,4 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-// Package resource is reserved for pure child-resource builders (AWCP-6 onward).
-// Builders will not perform Kubernetes API calls.
+// Package resource defines pure child plans and deterministic identities.
+// Production field mappings land in AWCP-6 onward; builders never call Kubernetes.
 package resource
