@@ -1,0 +1,550 @@
+{
+  "preparedAt": "2026-09-12",
+  "project": "AWCP",
+  "state": "Backlog created and verified; implementation not started",
+  "epic": {
+    "key": "AWCP-1",
+    "summary": "AI Workload Control Plane V0",
+    "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-1",
+    "description": "## 1. Amaç ve mimari\n\n Developer'ın tek bir namespaced `AIWorkload` kaynağı tanımlamasıyla güvenli ve gözlemlenebilir bir workload'un Kubernetes üzerinde oluşturulmasını, güncellenmesini, izlenmesini, drift durumunda yeniden reconcile edilmesini ve silinmesini sağlayan Go tabanlı Kubernetes operator geliştirmek.\n\nV0 ana akışı:\n\n```text\nDeveloper\n   ↓\nAIWorkload CR\n   ↓\nKubernetes API\n   ↓\nAIWorkload Controller\n   ↓\nReconciliation Loop\n   ├─ Deployment\n   ├─ Service\n   ├─ ServiceAccount\n   ├─ NetworkPolicy\n   └─ Status / Conditions / Events\n         ↓\n   Running Workload\n         ↓\nController Metrics\n         ↓\nPrometheus / Grafana\n```\n\n## 2. V0 kapsam sınırı\n\n**Dahil:**\n\n* Go\n* Kubebuilder\n* controller-runtime\n* `AIWorkload` CRD\n* Kubernetes reconciliation\n* Deployment\n* Service\n* ServiceAccount\n* Secret references\n* NetworkPolicy\n* readiness/liveness\n* status/conditions\n* Kubernetes Events\n* metrics\n* OpenTelemetry/Prometheus/Grafana\n* unit tests\n* envtest\n* kind E2E\n* Docker\n* GitHub Actions\n* Helm/Kustomize tabanlı kurulum\n* README/demo\n\n**V0 kapsam dışı:**\n\n* frontend\n* REST management API\n* SaaS\n* organizations/users\n* billing\n* GPU scheduling\n* inference server\n* LLM gateway\n* model routing\n* agent execution runtime\n* vector database\n* PostgreSQL\n* Redis\n* RabbitMQ/Kafka\n* multi-cluster\n* cloud-specific identity\n* Terraform\n* Argo CD\n* HPA\n* admission webhook\n* full multi-tenancy\n\n\n## 3. Teknik baseline ve karar durumu\n\n12 Eylül 2026 kaynak kontrolü: [Kubernetes sürüm sayfası](https://kubernetes.io/releases/) 1.37.0 güncel minor ve 1.36.4 bakım sürümünü listeliyor. [controller-runtime compatibility](https://github.com/kubernetes-sigs/controller-runtime#compatibility) v0.24 ailesini k8s.io v0.36 ve minimum Go 1.26 ile eşliyor. [v0.24.1 release](https://github.com/kubernetes-sigs/controller-runtime/releases/tag/v0.24.1) doğrulandı. [Kubebuilder release listesi](https://github.com/kubernetes-sigs/kubebuilder/releases) v4.16.0 gösteriyor; taslaktaki v4.15.0 artık güncel release olarak sunulmamalıdır.\n\nProje hedefi Kubernetes 1.36.x + controller-runtime v0.24.1 + Go 1.26.x. Exact patch/tool sürümleri, envtest binaries ve kind/node image digest'leri 01. adımda birlikte doğrulanarak pinlenir. Bu backlog sürüm uyumluluğunun projede test edildiği anlamına gelmez. [kind v0.33.0](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0) default node image 1.36.1 kullandığından en son Kubernetes patch'i için image varlığı varsayılmaz.\n\n## 4. Ortak uygulama sözleşmesi\n\n- Kubernetes API tek source of truth; spec desired state, status observed state. Harici DB/broker yoktur.\n- Controller aynı namespace içindeki Deployment, Service, ServiceAccount ve NetworkPolicy kaynaklarını parent UID ile yönetir. User Secret, Namespace ve shared infrastructure sahiplenilmez.\n- Aynı isimde başka sahibin kaynağı varsa ResourceOwnershipConflict; otomatik adoption/silme yoktur.\n- Dedicated workload ServiceAccount; token automount kapalı. Secret references aynı namespace'te envFrom ile kullanılır; Secret payload log/status/Event/metric içine yazılmaz.\n- Secret create/delete/restore watch ile reconcile tetikler. Secret kaybı contract'ı Degraded yapar; çalışan process'teki credential'ı geri alma ve otomatik env rotation V0 garantisi değildir.\n- NetworkPolicy default'u aynı namespace'ten workload container portuna ingress iznidir; egress izolasyonu getirmez. Generation kanıtı ile CNI trafik enforcement kanıtı ayrıdır.\n- replicas=0 geçerlidir; Ready=False, Progressing=False, Degraded=False ve ScaledToZero reason'ı üretilir.\n- Kustomize zorunlu install yolu; Helm gerekçeli opsiyoneldir. Prometheus/Grafana ve OTel Collector örneği dahildir; traces opsiyoneldir.\n- Her story için amaç, uygulama adımları, teknik kararlar/hata sınırları, kabul kriterleri, test senaryoları, teslim kanıtı, bağımlılıklar ve kaynaklar bulunur.\n- Testler ilgili davranışla birlikte yazılır. Yerel validation, hosted CI, etkin branch protection, yayın ve deployment ayrı kanıtlardır.\n\n## 5. Geliştirme sırası ve izlenebilirlik\n\nKaynak taslaktaki AWC-1..16 kimlikleri mantıksal sıra numarasıdır. Bu projenin gerçek anahtarı AWCP'dir; Jira otomatik numara üretir. Bu epic altındaki 16 Story'nin başındaki 01..16 sırası ve gerçek Blocks ilişkileri kullanılır.\n\n- [AWCP-2 — 01 — Technical baseline, scope ve architecture decisions](https://erayyilmmaz.atlassian.net/browse/AWCP-2) — 1.5–2 saat.\n- [AWCP-3 — 02 — Repository foundation ve Kubebuilder project bootstrap](https://erayyilmmaz.atlassian.net/browse/AWCP-3) — 1.5–2 saat.\n- [AWCP-4 — 03 — AIWorkload Custom Resource API ve validation contract](https://erayyilmmaz.atlassian.net/browse/AWCP-4) — 2–3 saat.\n- [AWCP-5 — 04 — Reconciliation engine ve resource ownership modeli](https://erayyilmmaz.atlassian.net/browse/AWCP-5) — 2–3 saat.\n- [AWCP-6 — 05 — Deployment reconciliation ve workload lifecycle](https://erayyilmmaz.atlassian.net/browse/AWCP-6) — 2–3 saat.\n- [AWCP-7 — 06 — Service discovery ve exposure lifecycle](https://erayyilmmaz.atlassian.net/browse/AWCP-7) — 1–1.5 saat.\n- [AWCP-8 — 07 — Workload identity, Secret references ve least-privilege security](https://erayyilmmaz.atlassian.net/browse/AWCP-8) — 2 saat.\n- [AWCP-9 — 08 — Network isolation ve NetworkPolicy reconciliation](https://erayyilmmaz.atlassian.net/browse/AWCP-9) — 1.5–2 saat.\n- [AWCP-10 — 09 — Status Conditions, failure model ve Kubernetes Events](https://erayyilmmaz.atlassian.net/browse/AWCP-10) — 2–3 saat.\n- [AWCP-11 — 10 — Controller observability ve metrics](https://erayyilmmaz.atlassian.net/browse/AWCP-11) — 2–3 saat.\n- [AWCP-12 — 11 — Deletion, garbage collection ve lifecycle edge cases](https://erayyilmmaz.atlassian.net/browse/AWCP-12) — 1–1.5 saat.\n- [AWCP-13 — 12 — Unit + envtest integration test suite](https://erayyilmmaz.atlassian.net/browse/AWCP-13) — 3–4 saat.\n- [AWCP-14 — 13 — kind-based end-to-end test environment](https://erayyilmmaz.atlassian.net/browse/AWCP-14) — 2–3 saat.\n- [AWCP-15 — 14 — Packaging ve developer installation experience](https://erayyilmmaz.atlassian.net/browse/AWCP-15) — 1.5–2 saat.\n- [AWCP-16 — 15 — CI quality gates ve supply-chain hygiene](https://erayyilmmaz.atlassian.net/browse/AWCP-16) — 2 saat.\n- [AWCP-17 — 16 — Documentation, portfolio demo ve V0 release](https://erayyilmmaz.atlassian.net/browse/AWCP-17) — 2 saat.\n\nBağımlılık akışı: 01 → 02 → 03 → 04 → 05; 05 ardından 06/07/08; 05–08 ardından 09; 04 ve 09 ardından 10; 05–09 ardından 11; 05–11 ardından 12; 12 → 13; 13 → 14; 12/13 → 15; 14/15 → 16. Tek tek geliştirme için 01..16 sırası uygundur.\n\n## 6. Efor ve çalışma takvimi\n\nStory tahminlerinin aritmetik toplamı 29–39 saattir; taslaktaki 29–38 saat yuvarlaması bu toplamla düzeltilmiştir. Tahminler başlangıç tahminidir; öğrenme, entegrasyon ve hata ayıklama sonrası yeniden değerlendirilir.\n\n2 saat/gün önerilen akış: gün 1–11 → adım 01–11; gün 12–13 → adım 12; gün 14 → adım 13; gün 15 → adım 14; gün 16 → adım 15; gün 17 → adım 16; gün 18–20 → regression/refactor/security review/buffer. 3–4 saatlik story iki güne taşabilir. 18–20 çalışma günü, haftada beş gün çalışılırsa yaklaşık dört iş haftası; her gün çalışılırsa yaklaşık üç takvim haftasıdır. Jira son tarihleri atanmaz.\n\n## 7. V0 Definition of Done\n\nEpic ancak şu uçtan uca senaryo çalışıyorsa kapanmalı:\n\n```text\nGiven\n  temiz bir local makine\n  Docker + pinlenmiş Go/kubectl/kind/Kustomize araçları\n  gerekli image ve test binary hazırlığı\n\nWhen\n  kind cluster kuruluyor\n  operator deploy ediliyor\n  AIWorkload oluşturuluyor\n\nThen\n  Deployment oluşuyor\n  Service oluşuyor\n  ServiceAccount oluşuyor\n  NetworkPolicy oluşuyor\n  workload Ready=True oluyor\n\nWhen\n  Deployment manuel siliniyor\n\nThen\n  controller tekrar yaratıyor\n\nWhen\n  image değiştiriliyor\n\nThen\n  Deployment rollout oluyor\n\nWhen\n  gerekli Secret kayboluyor\n\nThen\n  AIWorkload Degraded oluyor\n\nWhen\n  Secret geri geliyor\n\nThen\n  AIWorkload Ready oluyor\n\nWhen\n  AIWorkload siliniyor\n\nThen\n  controller-owned kaynaklar temizleniyor\n  user-owned Secret korunuyor\n\nAnd\n  reconcile metrics görülebiliyor\n  unit/envtest/E2E geçiyor\n  GitHub Actions yeşil\n  README üzerinden demo tekrar üretilebiliyor\n```\n\n\n\nEk kapanış kriterleri:\n\n- 16 Story'nin kabul kriterleri gerçek test/artefact bağlantılarıyla doğrulanmıştır.\n- Envtest API/ownership davranışını; kind gerçek rollout, trafik ve garbage collection davranışını kanıtlar.\n- Required checks'in workflow sonucu ve merge ruleset etkinliği ayrı doğrulanmıştır.\n- README operator deploy/image hazırlama adımlarını içerir; make install tek başına yeterli kabul edilmez.\n- Secret restore testi parent spec değiştirmeden geçer; foreign resource ve user Secret korunur.\n- Release hazırlığı ile gerçek release publication birbirinden ayrılır; v0.1.0 yayınlanmışsa gerçek link/digest kaydedilir.\n- CNI enforcement test edilmediyse bu sınırlama açıktır; production-ready/full tenant isolation iddiası yoktur.\n\n## 8. Sonraki sürüm sınırı\n\nArgo CD, Terraform, HPA, multi-tenancy ve cloud deployment ayrı bir Platform Hardening & GitOps epic'inde değerlendirilebilir. Bu aktarımda V1 epic'i veya V0 dışı görev açılmaz.\n"
+  },
+  "stories": [
+    {
+      "order": 1,
+      "sourceId": "AWC-1",
+      "summary": "01 — Technical baseline, scope ve architecture decisions",
+      "issueType": "Story",
+      "dependsOn": [],
+      "estimate": "1.5–2 saat.",
+      "description": "## 1. Amaç\n\nKod yazılmadan önce V0'ın neyi çözdüğünü, Kubernetes resource modelini ve controller responsibility boundary'sini sabitlemek.\n\n## 2. Kapsam ve uygulama adımları\n\n* `AIWorkload` domain kavramını tanımla.\n* V0 supported use-case'leri belge.\n* V0 non-goals listesini oluştur.\n* Kubernetes version baseline'ını sabitle.\n* Go/Kubebuilder/controller-runtime version matrisini sabitle.\n* Namespaced `AIWorkload` tercihinin ADR'ını yaz.\n* Control plane / managed workload sınırını tanımla.\n* Controller'ın sahip olduğu Kubernetes kaynaklarını belirle:\n\n  * Deployment\n  * Service\n  * ServiceAccount\n  * NetworkPolicy\n* Controller'ın **sahip olmadığı** kaynakları tanımla:\n\n  * user-created Secret\n  * Namespace\n  * CRD dışındaki shared infrastructure\n* Reconciliation responsibility matrix oluştur.\n* Resource naming convention belirle.\n* Kubernetes labels/annotations convention belirle.\n* OwnerReference politikasını belirle.\n* Deletion / garbage collection davranışını belirle.\n* Status/Condition modelinin ilk taslağını çıkar.\n* Security trust-boundary ADR oluştur.\n* V0'da admission webhook kullanılmaması kararını belge.\n* V0 API compatibility/versioning stratejisini belirle:\n\n  * `platform.example.io/v1alpha1`\n* ADR dizini oluştur.\n\n### Architecture decisions\n\nEn az:\n\n```text\nADR-001 — Why Kubernetes Operator\nADR-002 — Why Go\nADR-003 — Why Namespaced AIWorkload\nADR-004 — Reconciliation and Ownership Model\nADR-005 — Security and Secret Boundaries\nADR-006 — Observability Model\nADR-007 — API Versioning Strategy\n```\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Baseline hedefi Kubernetes 1.36.x + controller-runtime v0.24.1 + Go 1.26.x olarak korunur. 12 Eylül 2026 kaynak kontrolünde Kubernetes 1.36.4, Kubebuilder v4.16.0 ve kind v0.33.0 görülmüştür. Bunlar birlikte test edilmiş proje sürümleri değildir. Güncel sürüm ile proje tarafından desteklenen sürüm ayrı yazılır.\n- Kapanışta Go patch, Kubebuilder, tüm k8s.io/* modülleri, controller-tools, setup-envtest commit/tag, kind, node image digest, kubectl, Kustomize ve lint sürümlerini tek matriste kesinleştir. kind/node ve envtest binary bulunabilirliğini linux/amd64 ve darwin/arm64 için doğrula; bulunmayan artefact'a hayali digest yazma.\n- Control plane Kubernetes API'ye controller-runtime client üzerinden erişir. kubectl çağıran bir reconcile implementation, harici database ve broker yoktur. Deployment/Service/ServiceAccount/NetworkPolicy aynı namespace içinde parent UID ile sahiplenilir.\n- Adlandırmada uzun CR adlarını Kubernetes Service/label sınırlarına uygun kısalt ve deterministik hash ile çakışmayı önle. Adı aynı ama sahibi farklı kaynağı benimseme veya silme; ResourceOwnershipConflict üret.\n- Güven sınırı: AIWorkload oluşturabilen kişi izin verilen namespace içinde image çalıştırabilir ve Secret referansı verebilir. Bu, tek başına tenant izolasyonu veya Secret bazında yetkilendirme sağlamaz. Watch kapsamı, RBAC kapsamı ve cluster yöneticisinin sorumluluğu ADR-005'te açıklanır.\n- ADR-008 — Deletion and Finalizers ekle. Dış kaynak temizliği bulunmayan V0'da Kubernetes garbage collection tercih edilir. Kustomize zorunlu paketleme yolu; Helm gerekçeli opsiyoneldir. OpenTelemetry Collector örneği dahildir; trace instrumentasyonu opsiyoneldir.\n\n## 4. Kabul kriterleri\n\n* V0'ın işlevsel sınırı açıkça belgelenmiştir.\n* Her generated Kubernetes resource için controller ownership kararı vardır.\n* User-owned Secret'lar controller tarafından oluşturulmaz veya mutate edilmez.\n* Source-of-truth'ın Kubernetes API olduğu açıkça belirtilmiştir.\n* Harici database gerektirilmediği belgelenmiştir.\n* `spec` desired state, `status` observed state olarak tanımlanmıştır.\n* Unsupported özelliklerin listesi README/ADR'larda görünürdür.\n* Kubernetes/controller-runtime sürüm baseline'ı pin edilmiştir.\n* Architecture'da gereksiz message broker veya datastore bulunmamaktadır.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Sürüm matrisi ile scaffold go.mod/Makefile uyumunu karşılaştır; desteklenmeyen kombinasyonu başlangıç engeli olarak kaydet.\n2. Her dört owned resource ve üç user/shared resource sınıfı için create/update/delete yetkisini matriste gözden geçir.\n3. AWC-1..16 kapsamını ADR, test katmanı ve teslim çıktısıyla eşleştir; açık kararlar bu görevin kapanışında çözülmüş olsun.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\ndocs/architecture.md, docs/scope.md, docs/compatibility.md, docs/adr/ADR-001..008 ve sorumluluk matrisi.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 01 / 16. Kaynak taslaktaki kimlik: AWC-1 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: Yok; ilk başlanacak çalışma.\n\nBaşlangıç tahmini: 1.5–2 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [kubernetes.io/releases/](https://kubernetes.io/releases/)\n- [github.com/kubernetes-sigs/controller-runtime#compatibility](https://github.com/kubernetes-sigs/controller-runtime#compatibility)\n- [github.com/kubernetes-sigs/controller-runtime/releases/tag/v0.24.1](https://github.com/kubernetes-sigs/controller-runtime/releases/tag/v0.24.1)\n- [github.com/kubernetes-sigs/kubebuilder/releases](https://github.com/kubernetes-sigs/kubebuilder/releases)\n- [go.dev/dl/](https://go.dev/dl/)\n- [github.com/kubernetes-sigs/kind/releases/tag/v0.33.0](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0)",
+      "key": "AWCP-2",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-2",
+      "dependsOnKeys": []
+    },
+    {
+      "order": 2,
+      "sourceId": "AWC-2",
+      "summary": "02 — Repository foundation ve Kubebuilder project bootstrap",
+      "issueType": "Story",
+      "dependsOn": [
+        1
+      ],
+      "estimate": "1.5–2 saat.",
+      "description": "## 1. Amaç\n\nReproducible Go/Kubernetes operator geliştirme ortamını oluşturmak.\n\n## 2. Kapsam ve uygulama adımları\n\n* Git repository oluştur.\n* Go module tanımla.\n* Kubebuilder project scaffold oluştur.\n* `AIWorkload` API/controller scaffold oluştur.\n* Repository klasörlerini düzenle.\n\nBeklenen ana yapı:\n\n```text\n.\n├── api/\n│   └── v1alpha1/\n├── cmd/\n├── config/\n│   ├── crd/\n│   ├── default/\n│   ├── manager/\n│   ├── rbac/\n│   └── samples/\n├── internal/\n│   ├── controller/\n│   ├── resource/\n│   └── telemetry/\n├── test/\n│   └── e2e/\n├── docs/\n│   └── adr/\n├── Dockerfile\n├── Makefile\n├── PROJECT\n├── go.mod\n└── README.md\n```\n\n* Dependency versiyonlarını pin et.\n* `make generate`\n* `make manifests`\n* `make build`\n* `make test`\n* `make lint`\n  workflow'larını doğrula.\n* golangci-lint ekle.\n* `.editorconfig` oluştur.\n* `.gitignore` oluştur.\n* LICENSE ekle.\n* Makefile hedeflerini normalize et.\n* controller container image build'i doğrula.\n* multi-stage Dockerfile oluştur.\n* non-root container user kullan.\n* Docker image metadata/labels ekle.\n* local dev prerequisites dokümante et.\n\nKubebuilder'ın scaffold'u zaten manifests, code generation, envtest, build ve e2e için uygun Makefile yapısını destekliyor. ([book-v3.book.kubebuilder.io](https://book.kubebuilder.io/cronjob-tutorial/basic-project.html))\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Mevcut repository varsa scaffold öncesinde içeriğini ve yerel talimatları incele. Go module/Git remote kimliğini mevcut proje bilgisine göre belirle; example adresini gerçek remote gibi kullanma. Git işlemleri bu planın aktarılmasıyla yapılmış sayılmaz.\n- make test gerekli envtest binary'lerini hazırlayan giriş noktasıdır; doğrudan go test ./... için KUBEBUILDER_ASSETS ön koşulunu belge. İlk tool/image indirmeleri ağ gerektirebilir; bağımlılıklar hazırlandıktan sonraki unit/envtest çalışması dış servise bağlı olmamalıdır.\n- Make hedefleri unit, envtest ve ileride e2e olarak ayrıştırılabilir; scaffold boş testlerinin ürün davranışını doğruladığı iddia edilmez. go test -race uygun CI platformunda çalıştırılır.\n- Controller container: non-root UID, allowPrivilegeEscalation=false, capabilities drop ALL ve uygun seccomp profili; gerekli writable path varsa açıkça tanımlanır. Base image sürümü/digest'i pinlenir.\n- Manager health/readiness ve leader election ayarlarını yapılandır. Birden fazla manager replica desteklenecekse Lease RBAC ve tek aktif lider davranışı E2E'de doğrulanmadan destek iddiası yazma.\n\n## 4. Kabul kriterleri\n\n* Repository sıfırdan clone edildiğinde documented prerequisites ile build edilebilir.\n* `go test ./...` başarılıdır.\n* `go vet ./...` başarılıdır.\n* lint başarılıdır.\n* generated CRD/RBAC artefact'ları reproducible'dır.\n* manager container image build edilebilir.\n* container root olarak çalışmaz.\n* generated code ile handwritten code sınırı nettir.\n* repository'de secret/credential bulunmaz.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Temiz geçici çalışma alanında documented prerequisites ile generate, manifests, build, vet, lint ve test akışını çalıştır.\n2. Üretimi iki kez çalıştır; ikinci çalışmada generated dosyalarda fark olmamasını doğrula.\n3. Container image build et; image user/security configuration ve process health sonucunu kontrol et.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nÇalışan Kubebuilder scaffold, go.mod/go.sum, PROJECT, Makefile, Dockerfile, lint/editor ayarları ve geliştirme ön koşulları.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 02 / 16. Kaynak taslaktaki kimlik: AWC-2 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-2 — Adım 01](https://erayyilmmaz.atlassian.net/browse/AWCP-2)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 1.5–2 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [book.kubebuilder.io/cronjob-tutorial/basic-project.html](https://book.kubebuilder.io/cronjob-tutorial/basic-project.html)\n- [github.com/kubernetes-sigs/kubebuilder/releases](https://github.com/kubernetes-sigs/kubebuilder/releases)",
+      "key": "AWCP-3",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-3",
+      "dependsOnKeys": [
+        "AWCP-2"
+      ]
+    },
+    {
+      "order": 3,
+      "sourceId": "AWC-3",
+      "summary": "03 — AIWorkload Custom Resource API ve validation contract",
+      "issueType": "Story",
+      "dependsOn": [
+        2
+      ],
+      "estimate": "2–3 saat.",
+      "description": "## 1. Amaç\n\nDeveloper-facing platform API'sini tanımlamak.\n\nKubernetes CRD'leri declarative API oluşturmak için custom controller ile birlikte kullanılabiliyor; ayrıca `/status` subresource, controller'ın observed state'i kullanıcı tarafından yazılan spec'ten ayırmasını sağlıyor. ([Kubernetes](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/))\n\n## 2. Kapsam ve uygulama adımları\n\n### Önerilen V0 spec\n\n```yaml\napiVersion: platform.example.io/v1alpha1\nkind: AIWorkload\n\nmetadata:\n  name: demo-agent\n\nspec:\n  image: ghcr.io/example/demo-agent:v1\n\n  replicas: 1\n\n  container:\n    port: 8080\n\n  resources:\n    requests:\n      cpu: \"100m\"\n      memory: \"128Mi\"\n    limits:\n      cpu: \"500m\"\n      memory: \"512Mi\"\n\n  health:\n    readiness:\n      path: /ready\n    liveness:\n      path: /health\n\n  service:\n    enabled: true\n    port: 80\n\n  secretRefs:\n    - agent-api-secrets\n\n  network:\n    enabled: true\n```\n\n### Tasks\n\n* `AIWorkloadSpec` oluştur.\n* `AIWorkloadStatus` oluştur.\n* required/optional fields belirle.\n* default values belirle.\n* validation markers ekle.\n* replica limitlerini belirle.\n* container port validation ekle.\n* image empty validation ekle.\n* resource requirements modelle.\n* readiness/liveness modelle.\n* service configuration modelle.\n* secret references modelle.\n* network configuration modelle.\n* status subresource etkinleştir.\n* printer columns tanımla.\n\nÖrneğin:\n\n```text\nNAME\nREADY\nREPLICAS\nIMAGE\nAGE\n```\n\n* CRD OpenAPI schema üret.\n* sample valid manifest oluştur.\n* invalid manifest fixtures oluştur.\n* future compatibility için unknown-field davranışını incele.\n* API field documentation ekle.\n\n### Status taslağı\n\n```yaml\nstatus:\n  observedGeneration: 4\n  desiredReplicas: 2\n  readyReplicas: 2\n  endpoint: demo-agent.default.svc:80\n  conditions:\n    - type: Ready\n      status: \"True\"\n      reason: WorkloadReady\n      message: \"Current generation is ready.\"\n      observedGeneration: 4\n      lastTransitionTime: \"2026-09-12T09:00:00Z\"\n    - type: Progressing\n      status: \"False\"\n      reason: WorkloadReady\n      message: \"Rollout is complete.\"\n      observedGeneration: 4\n      lastTransitionTime: \"2026-09-12T09:00:00Z\"\n    - type: Degraded\n      status: \"False\"\n      reason: WorkloadReady\n      message: \"No blocking failure is observed.\"\n      observedGeneration: 4\n      lastTransitionTime: \"2026-09-12T09:00:00Z\"\n```\n\n## 3. Teknik kararlar ve hata sınırları\n\n- V0 contract: image zorunlu ve boş/yalnız boşluk olamaz; replicas varsayılan 1, izin verilen aralık 0..20; container.port zorunlu 1..65535; service.enabled varsayılan true, service.port varsayılan 80 ve 1..65535; network.enabled varsayılan true; secretRefs varsayılan boş liste. Açık false ve 0 değerleri default tarafından ezilmez.\n- resources için CPU/memory requests ve limits desteklenir. Miktar biçimi, negatif değer ve request > limit durumu validation fixtures ile test edilir. Şema/CEL ile güvenle doğrulanamayan bir kural varsa child API reddi actionable condition'a çevrilir; admission webhook eklenmez.\n- health readiness/liveness HTTP path alanları opsiyoneldir: ilgili blok yoksa probe yoktur, varsa path '/' ile başlar ve named container port kullanılır. Period/timeout/failureThreshold sabit V0 değerleri API dokümanında açıklanır; slow-start/startupProbe ileri sürüm kapsamıdır.\n- secretRefs aynı namespace içindeki Secret adlarıdır; boş, geçersiz ve tekrar eden adlar reddedilir. V0 envFrom kullanır; sıra korunur ve çakışan anahtarlarda sonraki Secret kazanır. envFrom key uyumluluğu ve gerekli anahtarların uygulama sorumluluğu olduğu belgelenir. Secret payload API'ye eklenmez.\n- status koşulları metav1.Condition sözleşmesini izler: type/status/reason/message/lastTransitionTime/observedGeneration. conditions type anahtarlı map list olur. Top-level observedGeneration, desiredReplicas, readyReplicas ve endpoint yer alır. YAML örneği şemayla birebir test edilir.\n- Unknown fields için structural schema pruning ve fieldValidation=Strict farkını belge; silent acceptance beklentisini engelleyen negative fixture ekle. API group platform.example.io örnek alanıdır; bu değer V0 contract seçimi olarak tutarlı kullanılır.\n\n## 4. Kabul kriterleri\n\n* CRD namespaced'dir.\n* `/status` subresource aktiftir.\n* Invalid replicas Kubernetes API validation seviyesinde reddedilir.\n* Invalid port reddedilir.\n* Required image olmadan resource kabul edilmez.\n* `kubectl explain aiworkload.spec` anlamlı açıklamalar gösterir.\n* valid sample API tarafından kabul edilir.\n* invalid fixtures beklenen validation failure'larını üretir.\n* controller henüz çalışmasa dahi CRD contract bağımsız olarak test edilebilir.\n* `spec` ve `status` responsibility ayrımı korunur.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Valid manifesti gerçek API server'a gönder, default alanları geri oku; explicit replicas=0 ve enabled=false değerlerini ayrı test et.\n2. image yok/boş, replicas=-1/21, port=0/65536, tekrar eden Secret ve geçersiz path örneklerinin reddedildiğini kontrol et.\n3. kubectl explain, printer columns, status subresource ve status yazımının spec/generation davranışını doğrula.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\napi/v1alpha1 types, generated CRD, alan/default/validation tablosu, valid/invalid fixtures ve status örnekleri.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 03 / 16. Kaynak taslaktaki kimlik: AWC-3 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-3 — Adım 02](https://erayyilmmaz.atlassian.net/browse/AWCP-3)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2–3 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)\n- [kubernetes.io/docs/concepts/configuration/secret/](https://kubernetes.io/docs/concepts/configuration/secret/)",
+      "key": "AWCP-4",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-4",
+      "dependsOnKeys": [
+        "AWCP-3"
+      ]
+    },
+    {
+      "order": 4,
+      "sourceId": "AWC-4",
+      "summary": "04 — Reconciliation engine ve resource ownership modeli",
+      "issueType": "Story",
+      "dependsOn": [
+        3
+      ],
+      "estimate": "2–3 saat.",
+      "description": "## 1. Amaç\n\nController'ın temel control-loop davranışını oluşturmak.\n\n## 2. Kapsam ve uygulama adımları\n\n* `AIWorkloadReconciler` oluştur.\n* Resource fetch davranışını uygula.\n* NotFound handling ekle.\n* reconcile request logging context oluştur:\n\n  * namespace\n  * name\n  * generation\n* desired state builder abstraction oluştur.\n* idempotent reconciliation modeli uygula.\n* owner references ekle.\n* controller-owned resource watch'larını ekle.\n* Deployment drift'inin reconcile tetiklemesini sağla.\n* Service drift'inin reconcile tetiklemesini sağla.\n* ServiceAccount drift'inin reconcile tetiklemesini sağla.\n* NetworkPolicy drift'inin reconcile tetiklemesini sağla.\n* create/update/no-op ayrımını implemente et.\n* conflict/error handling yap.\n* controller-runtime requeue/backoff davranışını gereksiz yere override etme.\n* reconcile result semantics belge.\n* duplicate reconcile'ın duplicate resource üretmediğini test et.\n\nKubebuilder `Owns()` kullanımı sayesinde controller'ın oluşturduğu secondary resource değiştiğinde parent resource yeniden reconcile edilebilir. ([book.kubebuilder.io](https://book.kubebuilder.io/reference/watching-resources/secondary-owned-resources.html))\n\n### Temel invariant\n\n```text\nReconcile(x) + Reconcile(x)\n```\n\nsonucu:\n\n```text\nReconcile(x)\n```\n\nile aynı desired state'i üretmelidir.\n\nBaşka bir ifadeyle reconcile **idempotent** olmalıdır.\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Reconcile sırası: parent fetch → deletion guard → Secret ön koşulları → ServiceAccount → Deployment → isteğe bağlı Service/NetworkPolicy → observed status. Geçici kısmi oluşturma sonraki reconcile ile tamamlanır; birden çok kaynağın atomik transaction içinde yaratıldığı varsayılmaz.\n- Mutate/delete öncesi owner UID ve namespace doğrulanır. Başkasına ait aynı isimli kaynakta ResourceOwnershipConflict; otomatik adoption veya destructive recreate yoktur. Controller'a ait alanları patch et, Kubernetes defaultlarını normalize ederek sürekli update döngüsünü önle.\n- Watch/predicate tasarımı parent spec değişimini, child deletion/drift ve Deployment status değişimini kapsar. GenerationChangedPredicate'in bütün watch'lara uygulanıp readiness/status olaylarını kaybetmesine izin verme.\n- API Conflict, AlreadyExists, Forbidden, timeout ve throttling ayrı ele alınır. Retry edilebilir hata framework backoff'una döner; kalıcı input/ownership hatası condition/event ile görünür olur ve hot loop oluşturmaz.\n- Secret watch/index tasarımının bağlantı noktası burada kurulur; gerçek Secret lifecycle davranışı 07. adımda tamamlanır. Secret silindikten sonra parent spec değişikliği gerektirmeden yeniden reconcile edilmelidir.\n\n## 4. Kabul kriterleri\n\n* Aynı `AIWorkload` için art arda reconcile çağrıları duplicate resource üretmez.\n* Owned resource silinirse controller yeniden oluşturur.\n* Managed field değiştirilirse desired state yeniden uygulanır.\n* Controller restart sonrası state database gerektirmeden yeniden oluşturulabilir.\n* Unexpected error diğer `AIWorkload` resource'larının reconcile edilmesini kalıcı olarak durdurmaz.\n* User-owned resources owner reference ile yanlışlıkla controller'a bağlanmaz.\n* Resource watch'ları gereksiz reconcile storm üretmeyecek şekilde yapılandırılmıştır.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Aynı parent için create → tekrar reconcile → no-op; child resourceVersion ve API yazma sayısını karşılaştır.\n2. Dört owned resource için delete ve managed-field drift yap; yalnız hedef parent'ın düzeldiğini doğrula.\n3. Foreign owner çakışması, injected conflict/Forbidden ve restart sonrası recovery çalıştır; unrelated parent'ın ilerlediğini kontrol et.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nReconciler iskeleti, desired-state arayüzleri, watch/predicate tasarımı, ownership guard ve retry sözleşmesi.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 04 / 16. Kaynak taslaktaki kimlik: AWC-4 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-4 — Adım 03](https://erayyilmmaz.atlassian.net/browse/AWCP-4)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2–3 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [book.kubebuilder.io/reference/watching-resources/secondary-owned-resources.html](https://book.kubebuilder.io/reference/watching-resources/secondary-owned-resources.html)\n- [book.kubebuilder.io/reference/watching-resources/secondary-resources-not-owned.html](https://book.kubebuilder.io/reference/watching-resources/secondary-resources-not-owned.html)",
+      "key": "AWCP-5",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-5",
+      "dependsOnKeys": [
+        "AWCP-4"
+      ]
+    },
+    {
+      "order": 5,
+      "sourceId": "AWC-5",
+      "summary": "05 — Deployment reconciliation ve workload lifecycle",
+      "issueType": "Story",
+      "dependsOn": [
+        4
+      ],
+      "estimate": "2–3 saat.",
+      "description": "## 1. Amaç\n\n`AIWorkload.spec` → Kubernetes Deployment mapping'ini gerçekleştirmek.\n\n## 2. Kapsam ve uygulama adımları\n\n* Deployment desired-state builder oluştur.\n* deterministic resource name üret.\n* common labels oluştur.\n* selector labels sabitle.\n* container image mapping yap.\n* replica mapping yap.\n* resource requests/limits mapping yap.\n* container port mapping yap.\n* ServiceAccount binding ekle.\n* Secret reference mapping yap.\n* readiness probe oluştur.\n* liveness probe oluştur.\n* controller owner reference ekle.\n* Deployment create flow implement et.\n* Deployment update flow implement et.\n* immutable-field durumlarını ele al.\n* pod template değişikliğinin rollout tetiklemesini doğrula.\n* replicas update doğrula.\n* image update doğrula.\n* deleted Deployment recreation test et.\n* unmanaged annotations/metadata korunumu politikasını belirle.\n\nReadiness başarısız olduğunda Kubernetes pod'a trafik göndermemeyi; liveness başarısız olduğunda ise unhealthy container'ı yeniden başlatmayı destekliyor. ([Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/probes/))\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Deployment mapping'i bu adımda kurulur; dedicated ServiceAccount ve Secret ön koşulları 07. adımda tamamlanır. Bu nedenle 05'in kapanışı tam çalışan güvenlikli pod E2E kanıtı değildir; bu iki adım arasında döngüsel bağımlılık oluşturma.\n- Pod security varsayılanları non-root, privilege escalation kapalı, capabilities drop ALL ve RuntimeDefault seccomp olur. V0 public/demo image non-root çalışabilir olmalıdır; keyfi/root gerektiren image'lar için uyumluluk garantisi verilmez.\n- Image tag/digest değişimi veya probe/resources/secretRefs değişimi pod template'i günceller; sadece replicas değişimi ölçekler. Selector kimliği sabittir; immutable selector uyuşmazlığında açık hata üret, sessiz delete/recreate yapma.\n- Pod template/metadata için controller-owned label ve field listesi ADR'a uyar; unrelated annotation/label korunur. ImagePullPolicy açık ve sample image stratejisiyle uyumlu olur; no-op reconcile rollout başlatmaz.\n- ImagePullBackOff, CrashLoop, readiness başarısızlığı, quota/insufficient resource ve progress deadline davranışını Deployment/Pod teşhisi ile belge. Pod-level teşhis eklenirse read RBAC ve veri minimizasyonu birlikte gözden geçirilir.\n\n## 4. Kabul kriterleri\n\nGiven:\n\n```yaml\nspec:\n  image: demo:v1\n  replicas: 2\n```\n\ncontroller:\n\n```text\nDeployment/demo\nreplicas=2\nimage=demo:v1\n```\n\noluşturur.\n\nAyrıca:\n\n* image değişince rollout oluşur.\n* replicas değişince Deployment güncellenir.\n* resource limits doğru propagate edilir.\n* health probes doğru propagate edilir.\n* deleted Deployment geri oluşturulur.\n* unrelated `AIWorkload` etkilenmez.\n* owner reference doğrudur.\n* controller-generated fields deterministic'tir.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Builder ve envtest'te image, replicas, ports, requests/limits, probes, identity ve owner UID alanlarını doğrula.\n2. Image v1→v2 ile template değişimini; replicas 1→2→0 ile scale davranışını; unchanged reconcile ile rollout olmamasını test et.\n3. Deployment silme, immutable field conflict ve başarısız image senaryolarının beklenen sonuçlarını kaydet; gerçek pod lifecycle kanıtı E2E adımında üretilir.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nDeployment builder/reconciliation, field ownership tablosu, mapping tests ve failure fixtures.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 05 / 16. Kaynak taslaktaki kimlik: AWC-5 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-5 — Adım 04](https://erayyilmmaz.atlassian.net/browse/AWCP-5)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2–3 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [kubernetes.io/docs/concepts/workloads/pods/probes/](https://kubernetes.io/docs/concepts/workloads/pods/probes/)",
+      "key": "AWCP-6",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-6",
+      "dependsOnKeys": [
+        "AWCP-5"
+      ]
+    },
+    {
+      "order": 6,
+      "sourceId": "AWC-6",
+      "summary": "06 — Service discovery ve exposure lifecycle",
+      "issueType": "Story",
+      "dependsOn": [
+        5
+      ],
+      "estimate": "1–1.5 saat.",
+      "description": "## 1. Amaç\n\nWorkload'a cluster-local erişim sağlamak.\n\n## 2. Kapsam ve uygulama adımları\n\n* Service builder oluştur.\n* V0 ServiceType'ı `ClusterIP` ile sınırla.\n* `service.enabled` davranışını uygula.\n* service port → targetPort mapping yap.\n* label selectors üret.\n* Service create/update/delete lifecycle implement et.\n* `service.enabled=false` durumunu ele al.\n* status endpoint üret.\n* immutable ClusterIP field'ını koru.\n* Service drift testleri yaz.\n* invalid target port senaryolarını test et.\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Service yalnız ClusterIP ve TCP destekler; targetPort named container port'a bağlanır. Servis portu 80 olsa bile NetworkPolicy ingress kuralı pod portunu hedefler.\n- clusterIP/clusterIPs, ipFamilies/ipFamilyPolicy gibi API tarafından tahsis edilen alanları koru; NodePort/LoadBalancer/headless configurasyonu V0 API'sine ekleme.\n- Endpoint yalnız Service mevcut ve enabled ise '<service>.<namespace>.svc:<port>' olarak yayınlanır; custom cluster DNS domain'i varsayılmaz. Endpoint varlığı pod readiness veya dışarıdan erişim kanıtı değildir.\n- Enabled→disabled geçişinde yalnız güncel parent UID'ye ait Service silinir ve stale endpoint temizlenir; yanlış owner kaynak korunur.\n\n## 4. Kabul kriterleri\n\n* service enabled olduğunda ClusterIP Service oluşturulur.\n* service disabled olduğunda controller Service oluşturmamalıdır.\n* enabled → disabled geçişinde önceki controller-owned Service temizlenir.\n* disabled → enabled yeniden oluşturur.\n* Service selector yalnız ilgili workload podlarını seçer.\n* mevcut `clusterIP` update sırasında yanlışlıkla sıfırlanmaz.\n* status'ta endpoint doğru gösterilir.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Enabled/disabled ve iki yönlü toggle akışını çalıştır; endpoint'in eklenip temizlendiğini kontrol et.\n2. Port güncellemesi sırasında ClusterIP aynı kalmalı, selector yalnız hedef podları seçmeli.\n3. E2E'de aynı namespace test client'ından servis DNS/HTTP erişimini doğrula; envtest'in veri düzlemi trafiğini test etmediğini belirt.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nService builder/lifecycle, endpoint contract ve toggle/immutable field tests.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 06 / 16. Kaynak taslaktaki kimlik: AWC-6 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-6 — Adım 05](https://erayyilmmaz.atlassian.net/browse/AWCP-6)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 1–1.5 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [kubernetes.io/docs/concepts/services-networking/service/](https://kubernetes.io/docs/concepts/services-networking/service/)",
+      "key": "AWCP-7",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-7",
+      "dependsOnKeys": [
+        "AWCP-6"
+      ]
+    },
+    {
+      "order": 7,
+      "sourceId": "AWC-7",
+      "summary": "07 — Workload identity, Secret references ve least-privilege security",
+      "issueType": "Story",
+      "dependsOn": [
+        5
+      ],
+      "estimate": "2 saat.",
+      "description": "## 1. Amaç\n\nHer workload için security-conscious identity modeli oluşturmak.\n\nKubernetes, uygulamaya özel ServiceAccount ve minimum gerekli RBAC kullanımını öneriyor; wildcard permissions ve gereksiz ClusterRoleBindings least-privilege açısından önerilmiyor. ([Kubernetes](https://kubernetes.io/docs/concepts/security/service-accounts/))\n\n## 2. Kapsam ve uygulama adımları\n\n* her `AIWorkload` için dedicated ServiceAccount oluştur.\n* workload'un `default` ServiceAccount kullanmasını engelle.\n* `automountServiceAccountToken` politikasına karar ver.\n* V0 default'u mümkünse:\n\n```yaml\nautomountServiceAccountToken: false\n```\n\nyap.\n\n* secretRef resolution davranışını oluştur.\n* Secret'ın varlığını doğrula.\n* Secret content loglama.\n* Secret content status'a yazma.\n* Secret kopyalama yapma.\n* controller user-owned Secret mutate etmesin.\n* eksik Secret için condition üret.\n* Controller manager RBAC kurallarını incele.\n* wildcard verb/resource kullanımlarını kaldır.\n* minimum required RBAC seti oluştur.\n* controller ServiceAccount permissions test et.\n* README security model dokümante et.\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Dedicated ServiceAccount ve Pod spec üzerinde automountServiceAccountToken=false zorunlu varsayılandır; workload için RoleBinding oluşturulmaz. Manager kimliği ve workload kimliği ayrıdır.\n- Secret create/update/delete olayları için namespace+Secret adı field index ve non-owned watch/map kur. Var olmayan Secret'ı referanslayan parent da index'te bulunmalı; Secret restore olduğunda elle CR değiştirmeden reconcile tetiklenmelidir.\n- Secret varlığı kontrolü payload okumadan metadata client/cache yaklaşımıyla tasarlanır. Ancak get/list/watch Secret RBAC'ı API düzeyinde payload'a erişim yetkisi verebilir; 'controller secret okuyamaz' iddiası yazma. Cache ve watch kapsamını namespace ile sınırla ve bu yetkiyi ADR'da açıkla.\n- Missing Secret: Ready=False, Degraded=True, reason=SecretNotFound. API Forbidden/timeout'u SecretNotFound diye maskeleme. Secret geri geldiğinde koşulu tekrar değerlendir; desired Deployment nesnesi mevcut olabilir, fakat pod çalışabilirliği ayrı gözlemlenir.\n- Secret silinmesi çalışan pod'un belleğindeki env değerini geri almaz; V0 credential revocation sağlamaz. Secret data değişince envFrom kullanan mevcut process otomatik güncellenmez; otomatik Secret rotation rollout V0 kapsam dışıdır, manuel rollout/new pod gereksinimi belgelenir.\n- Manager için AIWorkload read/watch, status patch/update, gerekli child verbs, Event write ve kullanılıyorsa Lease yetkilerini ayrı listele. Secret write/delete ve gereksiz CR spec write izinleri bulunmamalı. Workload creator'ın namespace Secret erişim etkisini güven modeli kapsamında açıkla.\n\n## 4. Kabul kriterleri\n\n* her workload dedicated ServiceAccount ile çalışır.\n* Secret içeriği hiçbir controller log'unda bulunmaz.\n* Secret içeriği metric label olarak bulunmaz.\n* Secret içeriği status'ta bulunmaz.\n* controller Secret mutate/delete etmez.\n* eksik Secret workload condition'ını `Ready=False` yapabilir.\n* controller `cluster-admin` gerektirmez.\n* wildcard RBAC yalnız teknik olarak kaçınılmazsa ADR ile açıklanır.\n* controller generated RBAC review edilebilir durumdadır.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Eksik Secret ile oluştur → Secret ekle → Ready → Secret sil → Degraded → aynı isimle geri ekle → Ready; CR spec'ine dokunma.\n2. İki namespace'te aynı Secret adı kullan; yalnız referans veren doğru namespace parent'larının reconcile olduğunu doğrula.\n3. Sentinel sahte Secret ile log/status/event/metric çıktılarında değer sızıntısını ara; kubectl auth can-i ile manager/workload izinlerini ayrı kontrol et.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nServiceAccount reconciliation, Secret index/watch, missing/restore conditions, RBAC manifests ve security documentation.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 07 / 16. Kaynak taslaktaki kimlik: AWC-7 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-6 — Adım 05](https://erayyilmmaz.atlassian.net/browse/AWCP-6)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [book.kubebuilder.io/reference/watching-resources/secondary-resources-not-owned.html](https://book.kubebuilder.io/reference/watching-resources/secondary-resources-not-owned.html)\n- [kubernetes.io/docs/concepts/configuration/secret/](https://kubernetes.io/docs/concepts/configuration/secret/)\n- [kubernetes.io/docs/concepts/security/rbac-good-practices/](https://kubernetes.io/docs/concepts/security/rbac-good-practices/)\n- [kubernetes.io/docs/concepts/security/service-accounts/](https://kubernetes.io/docs/concepts/security/service-accounts/)",
+      "key": "AWCP-8",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-8",
+      "dependsOnKeys": [
+        "AWCP-6"
+      ]
+    },
+    {
+      "order": 8,
+      "sourceId": "AWC-8",
+      "summary": "08 — Network isolation ve NetworkPolicy reconciliation",
+      "issueType": "Story",
+      "dependsOn": [
+        5
+      ],
+      "estimate": "1.5–2 saat.",
+      "description": "## 1. Amaç\n\nWorkload network security'sini platform default'u haline getirmek.\n\nKubernetes NetworkPolicy, Pod'ların cluster içi/dışı L3/L4 trafik kurallarını tanımlayabiliyor; ancak enforcement kullanılan CNI'a bağlıdır. ([Kubernetes](https://kubernetes.io/docs/reference/kubernetes-api/networking/network-policy-v1/))\n\n## 2. Kapsam ve uygulama adımları\n\n* standard Kubernetes `networking.k8s.io/v1 NetworkPolicy` kullan.\n* V0 için vendor-specific Cilium/Calico resource kullanma.\n* `network.enabled` contract'ını tanımla.\n* workload selector oluştur.\n* ingress behavior belirle.\n* Service traffic için gerekli ingress allowance oluştur.\n* DNS egress ihtiyacını değerlendir.\n* external model/API kullanan workload'ların egress gereksinimi nedeniyle aşırı katı default tanımlama.\n* generated NetworkPolicy owner reference ekle.\n* enable/disable lifecycle uygula.\n* drift reconciliation test et.\n* policy generation unit testleri ekle.\n* kind E2E ortamında NetworkPolicy enforcement doğrulanacaksa destekleyen CNI kullandığını doğrula.\n\n### Önemli scope kararı\n\nV0:\n\n```text\nNetworkPolicy generation\n```\n\nkanıtlayacak.\n\nV0'ın amacı:\n\n```text\nenterprise egress firewall\n```\n\nyazmak değildir.\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Somut V0 default: network.enabled=true iken workload pod selector'ına Ingress policy uygula; yalnız aynı namespace'teki podlardan container TCP portuna girişe izin ver. Service IP'sini kaynak kimliği olarak kullanma. Cross-namespace ingress için V0 API parametresi yoktur.\n- V0 policy Egress isolation eklemez; DNS ve dış model/API erişimi bu policy tarafından kısıtlanmaz. Başka policy'lerin getirdiği kurallar geçerliliğini korur. 'Default-deny tüm trafik' veya egress firewall iddiası yazılmaz.\n- NetworkPolicy kuralları additive'dir; başka bir allow policy izolasyonu genişletebilir. Controller yalnız kendi policy'sini yönetir. Enabled=false diğer kullanıcı policy'lerini silmez.\n- Zorunlu V0 kanıtı policy generation/lifecycle'dır. Trafik engellendiği iddia edilecekse destekleyen CNI ve allow/deny testleri ayrıca koşulmalıdır; varsayılan kind ortamında enforcement kanıtı varsayılmaz.\n- Controller manager, DNS ve observability kaynaklarını workload selector'ından ayrı tut; policy pod portunu hedefler. service.enabled=false, network.enabled davranışını otomatik değiştirmez.\n\n## 4. Kabul kriterleri\n\n* enabled durumda standard NetworkPolicy oluşturulur.\n* disabled durumda oluşturulmaz.\n* existing controller-owned policy kaldırılabilir/reconcile edilir.\n* policy doğru pod labels seçer.\n* unrelated podları seçmez.\n* network policy controller'ın kendisini etkilemez.\n* vendor CRD dependency'si yoktur.\n* README, enforcement'ın CNI'a bağlı olduğunu açıkça söyler.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Policy selector, namespace/pod peer ve container port mapping'ini unit test ile karşılaştır.\n2. Enabled→disabled→enabled ve policy delete/drift recovery'yi doğrula; unrelated policy korunmalı.\n3. CNI profili varsa same-namespace allow, cross-namespace deny ve gerekli DNS/API egress'i test et; yoksa enforcement sonucu açıkça NOT TESTED yazılır.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nNetworkPolicy builder/lifecycle, ingress/egress contract, generation tests ve CNI kanıt sınırı dokümanı.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 08 / 16. Kaynak taslaktaki kimlik: AWC-8 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-6 — Adım 05](https://erayyilmmaz.atlassian.net/browse/AWCP-6)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 1.5–2 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [kubernetes.io/docs/concepts/services-networking/network-policies/](https://kubernetes.io/docs/concepts/services-networking/network-policies/)\n- [kubernetes.io/docs/reference/kubernetes-api/networking/network-policy-v1/](https://kubernetes.io/docs/reference/kubernetes-api/networking/network-policy-v1/)",
+      "key": "AWCP-9",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-9",
+      "dependsOnKeys": [
+        "AWCP-6"
+      ]
+    },
+    {
+      "order": 9,
+      "sourceId": "AWC-9",
+      "summary": "09 — Status Conditions, failure model ve Kubernetes Events",
+      "issueType": "Story",
+      "dependsOn": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "estimate": "2–3 saat.",
+      "description": "## 1. Amaç\n\nDeveloper'ın sadece “çalışmıyor” değil, **neden çalışmadığını** anlayabilmesini sağlamak.\n\n## 2. Kapsam ve uygulama adımları\n\n* `observedGeneration` yönet.\n* standard condition helper yapısı oluştur.\n* minimum conditions:\n\n```text\nReady\nProgressing\nDegraded\n```\n\n* reason code sözleşmesi oluştur.\n\nÖrnekler:\n\n```text\nReconciling\nDeploymentCreated\nDeploymentUnavailable\nSecretNotFound\nServiceCreated\nPolicyCreated\nReconcileFailed\nWorkloadReady\n```\n\n* human-readable condition messages ekle.\n* status write-loop riskini önle.\n* status yalnız değiştiğinde update edilsin.\n* readyReplicas güncelle.\n* desiredReplicas güncelle.\n* endpoint güncelle.\n* Kubernetes Events ekle.\n* successful event spam'ini önle.\n* failure event üret.\n* transient vs persistent failure ayrımını tanımla.\n* observedGeneration semantics test et.\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Ready=True yalnız güncel CR generation işlenmiş, Secret/ownership ön koşulları sağlanmış, gerekli child kaynaklar desired state'te ve Deployment güncel rollout için gerekli ready replica sayısına erişmişse yazılır. Eski Deployment Available koşulu yeni image rollout'unu hazır gösteremez.\n- Status tablosu: converging → Ready=False/Progressing=True/Degraded=False; healthy → True/False/False; missing Secret veya ownership conflict → False/False/True; replicas=0 → False/False/False, reason=ScaledToZero. Kalıcı Deployment progress deadline failure Degraded=True olur.\n- observedGeneration reconcile'in değerlendirdiği spec generation'ı belirtir; başarılı rollout anlamına gelmez. Her condition da generation taşır. readyReplicas gözlemdir; desiredReplicas spec'ten gelir. Service kapatıldığında endpoint temizlenir.\n- Reason sözlüğü kararlı ve sınırlıdır: Reconciling, WorkloadReady, DeploymentUnavailable, ProgressDeadlineExceeded, SecretNotFound, ResourceOwnershipConflict, ReconcileFailed, ScaledToZero. DeploymentCreated/ServiceCreated/PolicyCreated Event reason'ları olabilir.\n- lastTransitionTime yalnız condition status değişince güncellenir. Semantik olarak aynı status yeniden yazılmaz; conflict durumunda taze obje üzerinden patch uygulanır. Başarı Event'leri create/gerçek transition ile sınırlanır; event/log message Secret payload veya ham hassas API body içermez.\n\n## 4. Kabul kriterleri\n\nBir eksik Secret senaryosu:\n\n```text\nREADY: False\nDEGRADED: True\nREASON: SecretNotFound\n```\n\nüretmelidir.\n\nAyrıca:\n\n* status spec'i mutate etmez.\n* condition transition time anlamlıdır.\n* aynı unchanged status tekrar tekrar API'ye yazılmaz.\n* current status hangi spec generation'a ait olduğu anlaşılır.\n* `kubectl describe aiworkload` developer'a actionable bilgi verir.\n* reconcile error sadece log'da kaybolmaz.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Missing Secret ve restore, healthy rollout, failed rollout, scale-to-zero ve ownership conflict için condition truth table assertion'ları yaz.\n2. Yeni generation sırasında eski hazır status'u ver; controller Ready=True üretmemeli.\n3. Unchanged reconcile döngülerinde status resourceVersion/transition timestamp sabit kalmalı; event spam olmamalı.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nStatus calculator, condition helpers, reason/event sözlüğü, failure matrix ve generation/no-op tests.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 09 / 16. Kaynak taslaktaki kimlik: AWC-9 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-6 — Adım 05](https://erayyilmmaz.atlassian.net/browse/AWCP-6), [AWCP-7 — Adım 06](https://erayyilmmaz.atlassian.net/browse/AWCP-7), [AWCP-8 — Adım 07](https://erayyilmmaz.atlassian.net/browse/AWCP-8), [AWCP-9 — Adım 08](https://erayyilmmaz.atlassian.net/browse/AWCP-9)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2–3 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)\n- [book.kubebuilder.io/reference/watching-resources/secondary-owned-resources.html](https://book.kubebuilder.io/reference/watching-resources/secondary-owned-resources.html)",
+      "key": "AWCP-10",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-10",
+      "dependsOnKeys": [
+        "AWCP-6",
+        "AWCP-7",
+        "AWCP-8",
+        "AWCP-9"
+      ]
+    },
+    {
+      "order": 10,
+      "sourceId": "AWC-10",
+      "summary": "10 — Controller observability ve metrics",
+      "issueType": "Story",
+      "dependsOn": [
+        4,
+        9
+      ],
+      "estimate": "2–3 saat.",
+      "description": "## 1. Amaç\n\nController'ın çalışma durumunu, hatalarını ve gecikmesini ölçülebilir ve güvenli biçimde gözlemlemek.\n\n## 2. Kapsam ve uygulama adımları\n\n* structured controller logging standardı tanımla.\n* reconcile duration metric oluştur.\n* reconcile outcome metric oluştur.\n* resource reconciliation counters oluştur.\n* failed reconciliation counter oluştur.\n* active AIWorkload gauge oluştur.\n* degraded workload gauge değerlendir.\n* metric cardinality review yap.\n* workload adı gibi unbounded label'ları Prometheus metriclerine koymama kararını uygula.\n* health endpoint kullan.\n* readiness endpoint kullan.\n* controller-runtime built-in metrics'lerini dokümante et.\n* Prometheus scrape configuration ekle.\n* Grafana dashboard oluştur.\n* OpenTelemetry Collector örnek deployment ekle.\n* traces gerekiyorsa controller operation span'ları ekle.\n* telemetry failure controller core reconciliation'ını bozmamalı.\n\nOpenTelemetry Collector vendor-neutral telemetry pipeline sağlıyor ve Kubernetes üzerinde Deployment, DaemonSet veya StatefulSet olarak kurulabiliyor. ([OpenTelemetry](https://opentelemetry.io/docs/collector/))\n\n### Örnek dashboard\n\n```text\nAI Workload Control Plane\n\nReconcile Rate\nReconcile Errors\nReconcile P95 Duration\nManaged Workloads\nReady Workloads\nDegraded Workloads\nController CPU\nController Memory\n```\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Built-in reconcile duration/outcome/error metriklerini önce envanterle; aynı olayı ölçen duplicate custom collector oluşturma. Custom resource operation counter gerekiyorsa kind/operation/result gibi sınırlı label seti kullan.\n- Managed/Ready/Degraded gauge'ları restart sonrası cache'den yeniden hesaplanmalı; her reconcile'de kör increment yapıp silmede drift üretmemeli. İsim, namespace, UID, image, URL, Secret ve serbest hata mesajı metric label olamaz.\n- Tek kanonik demo pipeline'ı tanımla: controller /metrics → Prometheus → Grafana. OTel Collector için opsiyonel alternatif scrape/export örneği ekle; iki yolun aynı seriyi duplicate toplamasını engelle. Traces koşullu geliştirmedir.\n- Metrics endpoint auth/TLS ve scrape RBAC ayarlarını pinned scaffold'a göre doğrula. ServiceMonitor yalnız Prometheus Operator CRD'si bulunan opsiyonel overlay'de olsun; temel install bu CRD'yi gerektirmesin.\n- Exporter/Collector/Grafana hatası reconcile'i bloke etmemeli; bounded queue/timeouts kullan. Manager health ve readiness telemetry backend'e bağımlı olmamalı. Controller CPU/memory panelinde kullanılan metrik kaynağı açıkça yazılır.\n\n## 4. Kabul kriterleri\n\n* reconcile error metric'te görünür.\n* reconcile latency ölçülebilir.\n* controller restart metric endpoint'ini bozmaz.\n* telemetry unavailable olduğunda reconcile çalışmaya devam eder.\n* metric labels düşük-cardinality'dir.\n* secret/user-sensitive data metriclerde bulunmaz.\n* Grafana dashboard repo içinde version-control edilir.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Kontrollü reconcile failure yarat; error artışı ve duration histogramının gözlendiğini doğrula.\n2. Workload create/degrade/delete ve manager restart sonrası gauge değerlerini gerçek obje sayılarıyla karşılaştır.\n3. Collector/Prometheus'u devre dışı bırakıp drift recovery'nin sürdüğünü kontrol et; dashboard JSON ve scrape konfigurasyonunu çalışır demo ile doğrula.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nStructured logging contract, metrics katalogu, scrape/RBAC config, Grafana dashboard JSON, OTel Collector örneği ve telemetry-failure testi.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 10 / 16. Kaynak taslaktaki kimlik: AWC-10 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-5 — Adım 04](https://erayyilmmaz.atlassian.net/browse/AWCP-5), [AWCP-10 — Adım 09](https://erayyilmmaz.atlassian.net/browse/AWCP-10)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2–3 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [book.kubebuilder.io/reference/metrics.html](https://book.kubebuilder.io/reference/metrics.html)\n- [opentelemetry.io/docs/collector/](https://opentelemetry.io/docs/collector/)",
+      "key": "AWCP-11",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-11",
+      "dependsOnKeys": [
+        "AWCP-5",
+        "AWCP-10"
+      ]
+    },
+    {
+      "order": 11,
+      "sourceId": "AWC-11",
+      "summary": "11 — Deletion, garbage collection ve lifecycle edge cases",
+      "issueType": "Story",
+      "dependsOn": [
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "estimate": "1–1.5 saat.",
+      "description": "## 1. Amaç\n\nCreate/update kadar deletion davranışının da deterministik olmasını sağlamak.\n\n## 2. Kapsam ve uygulama adımları\n\n* ownerReference garbage collection davranışını test et.\n* `AIWorkload` silindiğinde:\n\n  * Deployment\n  * Service\n  * ServiceAccount\n  * NetworkPolicy\n\nresource'larının temizlendiğini doğrula.\n\n* user-owned Secret'ın silinmediğini doğrula.\n* finalizer ihtiyacını değerlendiren ADR yaz.\n* V0'da yalnız Kubernetes-owned child resource cleanup varsa gereksiz finalizer ekleme.\n* future external resources için finalizer extension point belge.\n* partially-created workload deletion test et.\n* deletion sırasında reconciliation race test et.\n* child resource already missing durumunu test et.\n* repeated delete/reconcile davranışını doğrula.\n\nKubernetes finalizer mekanizması özellikle controller'ın Kubernetes dışındaki kaynakları temizlemesi gerektiğinde kullanılıyor. Bu nedenle V0 yalnız owner-referenced Kubernetes kaynakları yönetiyorsa finalizer'ı sırf “operator projesinde olur” diye eklememek daha doğru. ([book.kubebuilder.io](https://book.kubebuilder.io/reference/using-finalizers.html))\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Parent NotFound veya deletionTimestamp varsa yeni child üretme. Delete/create yarışı için owner UID ve gerekirse delete precondition kullan; aynı isimle yeniden yaratılan parent eski UID'den ayrılır.\n- V0 yalnız Kubernetes owned child'ları yönettiğinden özel finalizer eklenmez; finalizer extension point ADR-008'de gelecekteki dış kaynak gereksinimiyle açıklanır.\n- Parent GC temizliği asenkron ve bounded eventual assertion ile doğrulanır. Deployment'ın ReplicaSet/Pod alt ağacı da gerçek cluster testinde temizlenmelidir.\n- Envtest yalnız ownerReference ve deletion guard davranışını test eder; gerçek cascading garbage collection, namespace sonlanması ve pod temizliği kind E2E'de kanıtlanır.\n- Service/network disable işlemi yalnız güncel owner UID'ye ait child'a uygulanır. Operator uninstall ile CRD uninstall farklıdır; CRD silmek tüm CR'ları ve owned workload'ları etkileyebilir.\n\n## 4. Kabul kriterleri\n\n* parent silindiğinde owned child resources kalmaz.\n* user Secret silinmez.\n* deletion idempotent'tir.\n* stuck terminating resource yaratılmaz.\n* finalizer varsa somut bir cleanup requirement'ı vardır.\n* gereksiz finalizer bulunmaz.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Normal, kısmi create, child zaten yok ve parent silinirken reconcile senaryolarını çalıştır.\n2. Aynı isimle parent recreate et; eski UID child'ı yanlışlıkla sahiplenme veya yeni child'ı silme olmamalı.\n3. kind'de parent silindikten sonra dört child ve pod alt ağacı yok, user Secret mevcut olmalı.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nDeletion guards, ADR-008, ownership tests ve E2E GC acceptance senaryoları.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 11 / 16. Kaynak taslaktaki kimlik: AWC-11 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-6 — Adım 05](https://erayyilmmaz.atlassian.net/browse/AWCP-6), [AWCP-7 — Adım 06](https://erayyilmmaz.atlassian.net/browse/AWCP-7), [AWCP-8 — Adım 07](https://erayyilmmaz.atlassian.net/browse/AWCP-8), [AWCP-9 — Adım 08](https://erayyilmmaz.atlassian.net/browse/AWCP-9), [AWCP-10 — Adım 09](https://erayyilmmaz.atlassian.net/browse/AWCP-10)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 1–1.5 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [book.kubebuilder.io/reference/using-finalizers.html](https://book.kubebuilder.io/reference/using-finalizers.html)\n- [book.kubebuilder.io/reference/envtest.html](https://book.kubebuilder.io/reference/envtest.html)",
+      "key": "AWCP-12",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-12",
+      "dependsOnKeys": [
+        "AWCP-6",
+        "AWCP-7",
+        "AWCP-8",
+        "AWCP-9",
+        "AWCP-10"
+      ]
+    },
+    {
+      "order": 12,
+      "sourceId": "AWC-12",
+      "summary": "12 — Unit + envtest integration test suite",
+      "issueType": "Story",
+      "dependsOn": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "estimate": "3–4 saat.",
+      "description": "## 1. Amaç\n\nController behavior'ını gerçek cluster kurmadan büyük ölçüde doğrulayabilmek.\n\nKubebuilder'ın `envtest` yaklaşımı lokal `etcd` + Kubernetes API server çalıştırarak controller integration testleri yapılmasını sağlıyor. ([book.kubebuilder.io](https://book.kubebuilder.io/reference/envtest))\n\n## 2. Kapsam ve uygulama adımları\n\n### Unit test grupları\n\nTest et:\n\n* naming functions\n* labels\n* Deployment builder\n* Service builder\n* ServiceAccount builder\n* NetworkPolicy builder\n* condition helpers\n* defaulting/helper logic\n* status calculation\n\n### Envtest senaryoları\n\n#### Valid create\n\n```text\nCreate AIWorkload\n→ Deployment exists\n→ Service exists\n→ ServiceAccount exists\n→ NetworkPolicy exists\n```\n\n#### Update image\n\n```text\nv1 → v2\n→ Deployment updated\n```\n\n#### Update replicas\n\n```text\n1 → 3\n→ Deployment replicas=3\n```\n\n#### Drift\n\n```text\nDelete Deployment\n→ controller recreates Deployment\n```\n\n#### Missing Secret\n\n```text\nsecretRef missing\n→ Ready=False\n→ Degraded=True\n```\n\n#### Disable service\n\n```text\nenabled=true\n→ enabled=false\n→ Service deleted\n```\n\n#### Invalid CR\n\nAPI server validation tarafından reddedilir.\n\n#### Delete parent\n\nEnvtest: ownerReference ve deletion guard doğrulanır. Gerçek owned-resource garbage collection kind E2E'de doğrulanır.\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Test piramidi: saf builder/condition unit testleri; API schema/default/status/watch için envtest; scheduler/kubelet/rollout/Service trafiği/GC için kind. envtest'te Deployment status'u gerekiyorsa test fixture patch'ler; gerçek scheduler sonucu diye sunulmaz.\n- Parent delete envtest kabulü doğru owner UID ve deletion guard'dır. Gerçek child garbage collection assertion'ı E2E'ye aittir. Envtest namespace teardown için gerçek namespace controller beklenmez.\n- Suite yalnız Secret missing değil create/delete/restore watcher, all-child drift, enable/disable, collision, status no-op, explicit false/zero, Forbidden/Conflict ve restart senaryolarını kapsar.\n- İlk bağımlılık/binary hazırlığı internet gerektirebilir; hazır/cached asset ile unit/envtest çalıştırma dış API gerektirmez. Ağsız ilk kurulum garantisi verilmez.\n- Eventually/Consistently gibi bounded assertion'lar, context cancellation, benzersiz namespace, goroutine cleanup ve tek seferlik envtest.Stop hata kontrolü kullan. Rastgele sleep ve blanket retry ile gerçek hataları gizleme.\n\n## 4. Kabul kriterleri\n\n* critical reconciliation branches testlidir.\n* tests deterministic'tir.\n* external cloud bağımlılığı yoktur.\n* real OpenAI/Anthropic API çağrısı yoktur.\n* Hazırlanmış tool/binary bağımlılıkları ile unit/envtest çalışması dış servise ihtiyaç duymaz; ilk indirme ayrı ön koşuldur.\n* race-sensitive testlerde bounded eventual assertions kullanılır.\n* code coverage raporu CI'da üretilebilir.\n* generated manifests test öncesi güncellenir.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Unit suite + envtest'i temiz test state'iyle çalıştır; coverage ve uygun platformda race çıktısını kaydet.\n2. API validation/defaulting ve watch-triggered reconcile'i gerçek envtest API ile doğrula; fake client sonucu bunun yerine geçmez.\n3. Başarısız assertion ve shutdown senaryosunda test timeout/teardown'un anlaşılır hata ve temiz process bıraktığını kontrol et.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nUnit/envtest suites, traceability test matrisi, fixtures, coverage raporu ve test prerequisites.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 12 / 16. Kaynak taslaktaki kimlik: AWC-12 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-6 — Adım 05](https://erayyilmmaz.atlassian.net/browse/AWCP-6), [AWCP-7 — Adım 06](https://erayyilmmaz.atlassian.net/browse/AWCP-7), [AWCP-8 — Adım 07](https://erayyilmmaz.atlassian.net/browse/AWCP-8), [AWCP-9 — Adım 08](https://erayyilmmaz.atlassian.net/browse/AWCP-9), [AWCP-10 — Adım 09](https://erayyilmmaz.atlassian.net/browse/AWCP-10), [AWCP-11 — Adım 10](https://erayyilmmaz.atlassian.net/browse/AWCP-11), [AWCP-12 — Adım 11](https://erayyilmmaz.atlassian.net/browse/AWCP-12)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 3–4 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [book.kubebuilder.io/reference/envtest.html](https://book.kubebuilder.io/reference/envtest.html)\n- [github.com/kubernetes-sigs/kubebuilder/releases](https://github.com/kubernetes-sigs/kubebuilder/releases)\n- [book.kubebuilder.io/reference/envtest](https://book.kubebuilder.io/reference/envtest)",
+      "key": "AWCP-13",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-13",
+      "dependsOnKeys": [
+        "AWCP-6",
+        "AWCP-7",
+        "AWCP-8",
+        "AWCP-9",
+        "AWCP-10",
+        "AWCP-11",
+        "AWCP-12"
+      ]
+    },
+    {
+      "order": 13,
+      "sourceId": "AWC-13",
+      "summary": "13 — kind-based end-to-end test environment",
+      "issueType": "Story",
+      "dependsOn": [
+        12
+      ],
+      "estimate": "2–3 saat.",
+      "description": "## 1. Amaç\n\nGerçek Kubernetes scheduler/kubelet/controller-manager içeren lokal cluster'da uçtan uca demo ve regression testleri yapmak.\n\n`kind`, Docker container'larını Kubernetes node olarak kullanıyor ve local development/CI için tasarlanmış durumda. ([kind.sigs.k8s.io](https://kind.sigs.k8s.io/))\n\n## 2. Kapsam ve uygulama adımları\n\n* pinned Kubernetes node image kullan.\n* kind config oluştur.\n* test namespace oluştur.\n* controller image build et.\n* image'ı kind cluster'a load et.\n* CRD install et.\n* controller deploy et.\n* sample workload image oluştur.\n* sample app health endpoints ekle.\n* E2E harness oluştur.\n\n### E2E scenario 1 — create\n\n```text\nkubectl apply AIWorkload\n\n→ Deployment Available\n→ Service exists\n→ ServiceAccount exists\n→ NetworkPolicy exists\n→ AIWorkload Ready=True\n```\n\n### Scenario 2 — update\n\n```text\nimage v1 → v2\n```\n\nrollout başarıyla tamamlanmalı.\n\n### Scenario 3 — scale\n\n```text\nreplicas 1 → 2\n```\n\niki ready replica görülmeli.\n\n### Scenario 4 — drift recovery\n\n```text\nkubectl delete deployment demo\n```\n\ncontroller yeniden yaratmalı.\n\n### Scenario 5 — failure\n\nReferenced Secret sil:\n\n```text\nReady=False\nDegraded=True\n```\n\nolmalı.\n\nSecret geri oluştur:\n\n```text\nReady=True\n```\n\ndurumuna dönmeli.\n\n### Scenario 6 — deletion\n\n```text\nkubectl delete aiworkload demo\n```\n\nowned resources temizlenmeli.\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Cluster ve test image sürümü/digest'i 01. adım matrisine uyar. kind v0.33.0 release sayfasındaki default node 1.36.1'dir; Kubernetes 1.36.4 için hazır node image varlığı varsayılmaz. Seçilen exact node image ve digest ayrıca doğrulanır.\n- make kind-up → make install → image build/load → make deploy → rollout wait → sample apply akışı tek komutlu E2E target'ında birleştirilir. make install tek başına operator process'ini başlatmaz.\n- Demo app tamamen yereldir: /health, /ready, sürüm çıktısı; gerçek LLM credential veya ücretli API yoktur. v1/v2 image yerel build/load yapılır; registry publish zorunlu değildir.\n- Her test explicit kube-context ve benzersiz cluster/namespace kullanır; mevcut kullanıcı cluster'ını yanlışlıkla silmez. Cleanup yalnız bu suite'in oluşturduğu kaynakları hedefler.\n- Image failure, probe failure, Service request, all-child drift, Secret restore, operator restart ve GC için bounded timeout ve başarısızlık halinde log/Event/status artifact toplama ekle. Secret data dump alma.\n- Zorunlu profile standard policy generation doğrular. CNI enforcement profili ayrı ve opsiyoneldir; uygulanırsa CNI sürümü pinlenir ve deny/allow trafik testleri koşulur. ARM64 yerel çalışma ve Linux AMD64 CI sonuçları ayrı raporlanır.\n\n## 4. Kabul kriterleri\n\n* tek komutla E2E ortamı kurulabilir.\n* tek komutla silinebilir.\n* manual intervention gerektirmez.\n* test timeout'ları vardır.\n* cluster cleanup başarısız olsa bile script anlaşılır hata verir.\n* pinned Kubernetes sürümü kullanılır.\n* ARM64/macOS geliştirme ortamı göz önünde bulundurulur.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Temiz kind cluster'da altı orijinal E2E senaryosunu sırayla otomatik çalıştır ve Ready/rollout/GC sonuçlarını kaydet.\n2. Manager restart ardından drift oluştur; recovery ve gauges yeniden kurulsun.\n3. Testi kontrollü başarısız kıl; artifacts ve cleanup çalışmalı, başka cluster/context etkilenmemeli.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nkind config, local demo app/image, E2E harness, Make targets, diagnostics/cleanup ve platform uyumluluk notu.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 13 / 16. Kaynak taslaktaki kimlik: AWC-13 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-13 — Adım 12](https://erayyilmmaz.atlassian.net/browse/AWCP-13)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2–3 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [github.com/kubernetes-sigs/kind/releases/tag/v0.33.0](https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0)\n- [kind.sigs.k8s.io/](https://kind.sigs.k8s.io/)",
+      "key": "AWCP-14",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-14",
+      "dependsOnKeys": [
+        "AWCP-13"
+      ]
+    },
+    {
+      "order": 14,
+      "sourceId": "AWC-14",
+      "summary": "14 — Packaging ve developer installation experience",
+      "issueType": "Story",
+      "dependsOn": [
+        13
+      ],
+      "estimate": "1.5–2 saat.",
+      "description": "## 1. Amaç\n\nProjeyi yalnız repository içinden çalışan kod olmaktan çıkarıp kurulabilir bir platform bileşenine çevirmek.\n\n## 2. Kapsam ve uygulama adımları\n\n* production Docker image oluştur.\n* Kustomize default install akışını doğrula.\n* Helm packaging gereksinimini değerlendir.\n* V0 için Helm chart oluşturulacaksa:\n\n  * namespace\n  * image\n  * tag\n  * replicas\n  * resources\n  * metrics\n  * leader election\n    values'larını destekle.\n* CRD installation sürecini belge.\n* controller RBAC manifests dahil et.\n* uninstall davranışını belge.\n* CRD deletion riskini açıkla.\n* version metadata ekle.\n* container image tagging strategy oluştur.\n* release artifact strategy belirle.\n\n## 3. Teknik kararlar ve hata sınırları\n\n- Kustomize V0'ın zorunlu canonical install yoludur. Helm opsiyonel karar kaydıdır; chart yapılmazsa bu açıkça yazılır ve V0 eksik sayılmaz. Yapılırsa template/lint + gerçek install/upgrade/uninstall testleri aynı contract'a bağlanır.\n- CRD installation ile manager deployment ayrı anlatılır. Go gerektirmeyen release bundle ve image referansı hazırlanır; yayın öncesi kullanıcının erişemeyeceği image'la quick start başarılı gösterilmez.\n- Operator undeploy/uninstall workload namespace'ini veya CRD'yi otomatik silmemeli. CRD ve AIWorkload silme komutları ayrı, etkisi açıklanmış cleanup bölümünde verilir. Workload Namespace controller'a ownerReference ile bağlanmaz.\n- Image tag/digest, controller resources, namespace/watch kapsamı, metrics ve leader-election ayarları tüm paketlerde tutarlı olmalı. Helm eklenirse mevcut CRD'lerin upgrade davranışı ayrıca belgelenir.\n- 5 dakika hedefi Docker/cluster ve gerekli image'lar hazır olduktan sonraki deploy/sample akışına aittir; ilk indirmeler ve cluster hazırlama süresi ayrı ölçülür.\n\n## 4. Kabul kriterleri\n\nŞunlardan biriyle controller kurulabilir:\n\n```bash\nmake deploy\n```\n\nveya release sonrasında:\n\n```bash\nhelm install ...\n```\n\n* sample `AIWorkload` 5 dakikadan kısa developer flow ile çalıştırılabilir.\n* user'ın Go build environment kurması production install için gerekmez.\n* install/uninstall documented'dır.\n* uninstall user workload verisini sürpriz biçimde yok etmez.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Go kurulu olmayan kullanıcı akışını hazır image/bundle üzerinden doğrula; controller Ready ve sample Ready olsun.\n2. Undeploy sonrası CR/CRD/user Secret korunmalı; explicit cleanup komutları beklendiği gibi çalışmalı.\n3. Varsa Helm render/install/upgrade/uninstall ve Kustomize çıktısının image/RBAC/security eşdeğerliğini kontrol et.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nKustomize install/release bundle, opsiyonel Helm kararı/chart, image/version metadata ve install/upgrade/uninstall kılavuzu.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 14 / 16. Kaynak taslaktaki kimlik: AWC-14 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-14 — Adım 13](https://erayyilmmaz.atlassian.net/browse/AWCP-14)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 1.5–2 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [book.kubebuilder.io/cronjob-tutorial/basic-project.html](https://book.kubebuilder.io/cronjob-tutorial/basic-project.html)",
+      "key": "AWCP-15",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-15",
+      "dependsOnKeys": [
+        "AWCP-14"
+      ]
+    },
+    {
+      "order": 15,
+      "sourceId": "AWC-15",
+      "summary": "15 — CI quality gates ve supply-chain hygiene",
+      "issueType": "Story",
+      "dependsOn": [
+        12,
+        13
+      ],
+      "estimate": "2 saat.",
+      "description": "## 1. Amaç\n\nHer PR'ın üretilebilir ve test edilebilir olduğunu kanıtlamak.\n\n## 2. Kapsam ve uygulama adımları\n\n### GitHub Actions jobs\n\n```text\nformat\nlint\nvet\ngenerate-check\nmanifest-check\nunit-test\nenvtest\nbuild\ndocker-build\ne2e\n```\n\n### Tasks\n\n* GitHub Actions workflow oluştur.\n* dependency caching yapılandır.\n* generated-code drift check oluştur.\n* generated-manifest drift check oluştur.\n* unit tests çalıştır.\n* envtest çalıştır.\n* kind E2E çalıştır.\n* Docker build doğrula.\n* Go vulnerability scan eklemeyi değerlendir.\n* dependency update strategy belirle.\n* build artifact version bilgisi ekle.\n* timeout ayarla.\n* concurrent duplicate CI runs cancel et.\n* branch protection için required checks dokümante et.\n\n### Quality gate\n\nAşağıdaki başarısızlıklar required-check olarak etkinleştirilmiş branch protection/ruleset altında merge'i engellemelidir:\n\n```text\nlint      FAIL\ntest      FAIL\nenvtest   FAIL\nbuild     FAIL\ne2e       FAIL\n```\n\n## 3. Teknik kararlar ve hata sınırları\n\n- PR workflow varsayılan permissions contents:read; üçüncü taraf actions tam commit SHA ile pinlenir. Untrusted PR kodu privileged pull_request_target bağlamında çalıştırılmaz; build/test için publish credential gerekmez.\n- Formatting, lint, vet, code generation, manifests, unit, envtest, build, Docker ve e2e check adları kararlı tutulur. Fork PR da aynı secretsiz doğrulamaları koşabilmelidir.\n- Generate/manifests sonrası tracked değişiklik yanında yeni untracked generated dosyaları da yakala; yalnız git diff kontrolü yeterli olmayabilir. go.mod/go.sum drift kontrolü ekle.\n- govulncheck kullanımı ve dependency update policy kararı yazılır; seçilen scan CI'a eklenir. Image/base dependency sürümleri sabitlenir. Vulnerability database güncellemesinin ağ gerektirdiği ve tarama snapshot zamanı belgelenir.\n- Workflow başarısızlığı tek başına merge'i teknik olarak engellemez. Required status checks/ruleset ayrı yapılandırılmalı ve aktifliği kanıtlanmalı; yapılandırılmamışsa 'merge blocked' iddiası yapılmaz.\n- Publish/release işi PR validation'dan ayrıdır. Code/test sonucu, hosted CI sonucu, branch protection ayarı, image publication ve deploy kanıtları ayrı raporlanır.\n\n## 4. Kabul kriterleri\n\n* clean checkout CI'da başarılıdır.\n* local generated artefact değişmiş ama commit edilmemişse CI bunu yakalar.\n* failing test merge gate'i kırar.\n* test sonuçları görünürdür.\n* CI external paid cloud hesabı gerektirmez.\n* workflow secret gerektirmeden PR üzerinde çalışabilir.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Hosted temiz checkout PR run'ında bütün required jobs'u gözlemle; yalnız yerel komut başarısını CI başarısı sayma.\n2. Kontrollü test failure ve generated drift değişikliğiyle ilgili gate'in kırıldığını doğrula.\n3. Fork/secretsiz PR izinleri, timeout/concurrency ve retained diagnostics'i kontrol et; ruleset aktif değilse açık takip maddesi bırak.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nGitHub Actions workflows, check-name/branch-protection kılavuzu, supply-chain policy ve hosted run kanıtları.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 15 / 16. Kaynak taslaktaki kimlik: AWC-15 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-13 — Adım 12](https://erayyilmmaz.atlassian.net/browse/AWCP-13), [AWCP-14 — Adım 13](https://erayyilmmaz.atlassian.net/browse/AWCP-14)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [docs.github.com/en/actions/reference/security/secure-use](https://docs.github.com/en/actions/reference/security/secure-use)",
+      "key": "AWCP-16",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-16",
+      "dependsOnKeys": [
+        "AWCP-13",
+        "AWCP-14"
+      ]
+    },
+    {
+      "order": 16,
+      "sourceId": "AWC-16",
+      "summary": "16 — Documentation, portfolio demo ve V0 release",
+      "issueType": "Story",
+      "dependsOn": [
+        14,
+        15
+      ],
+      "estimate": "2 saat.",
+      "description": "## 1. Amaç\n\nRecruiter veya engineer repo'ya girdiğinde projenin değerini birkaç dakika içinde anlayabilsin.\n\n## 2. Kapsam ve uygulama adımları\n\n### README sections\n\n* Problem\n* Why this exists\n* Architecture\n* Key concepts\n* Quick Start\n* AIWorkload API\n* Example\n* Reconciliation model\n* Drift recovery\n* Security model\n* Observability\n* Testing strategy\n* Architecture Decisions\n* Limitations\n* Roadmap\n\n### Tasks\n\n* architecture diagram ekle.\n* sequence diagram ekle.\n\nÖrneğin:\n\n```text\nDeveloper\n   |\n   | kubectl apply\n   v\nAPI Server\n   |\n   v\nController\n   |\n   +---- Get desired state\n   |\n   +---- Compare observed state\n   |\n   +---- Create/Update resources\n   |\n   +---- Update status\n```\n\n* demo script oluştur.\n* `examples/basic.yaml`\n* `examples/with-secrets.yaml`\n* `examples/network-policy.yaml`\n* failure demo hazırla.\n* drift demo hazırla.\n* screenshots/GIF gerekiyorsa portfolio aşamasında ekle.\n* release checklist yaz.\n* semantic versioning stratejisi oluştur.\n* `v0.1.0` tag/release hazırlığı yap.\n\n### Portfolio demo\n\nDemo şu sırayı gösterebilmeli:\n\n```text\n1. Create AIWorkload\n\n2. Deployment appears\n\n3. Service appears\n\n4. Workload becomes Ready\n\n5. Manually delete Deployment\n\n6. Controller restores it\n\n7. Change image\n\n8. Rolling update occurs\n\n9. Remove required Secret\n\n10. Workload becomes Degraded\n\n11. Restore Secret\n\n12. Workload becomes Ready\n\n13. Open Grafana\n\n14. Show reconcile metrics\n\n15. Delete AIWorkload\n\n16. Owned resources disappear\n```\n\n## 3. Teknik kararlar ve hata sınırları\n\n- README quick start eksiksiz operator başlangıcını içermeli: prerequisites → kind-up → CRD install → manager image build/load veya hazır release image → deploy → manager rollout wait → sample apply → Ready wait. Sadece make install sonrası sample uygulamak yeterli değildir.\n- Demo 16 adımın tamamını gerçek cluster üzerinde göstermeli. Secret failure/recovery condition kanıtıdır; çalışan process'ten credential silindiği iddiası değildir. Grafana açma adımı kullanıcı demo aşamasına aittir.\n- README sınırları: alpha API, public/non-root image beklentisi, Secret env rotation kısıtı, CNI enforcement koşulu, aynı-namespace ingress default'u, egress kısıtlaması olmaması, custom DNS varsayımı yapılmaması ve full tenancy bulunmaması.\n- Release readiness ile gerçek tag/GitHub release/image publication farklı sonuçlardır. v0.1.0 notları ve artefact'lar hazırlanır; yayınlanma ancak gerçek link/digest ve başarılı workflow ile tamamlandı sayılır.\n- Story teslim standardı: değişen dosyalar, komutlar/sonuçları, kabul kriteri kanıtları, bilinen eksikler ve bir sonraki gerçek Jira issue bağlantısı. Test edilmemiş davranış Done kanıtı değildir.\n- Tahmin aralıkları başlangıç varsayımıdır. 2 saat/gün ile 18–20 çalışma günü yaklaşık 4 iş haftası veya her gün çalışılırsa yaklaşık 3 takvim haftasıdır; çalışma günleri ile takvim günlerini karıştırma.\n\n## 4. Kabul kriterleri\n\nYeni biri README üzerinden:\n\n```bash\ngit clone ...\nmake kind-up\nmake install\n# Manager image hazırlanır ve kind cluster'a yüklenir.\nmake deploy\n# Manager Deployment Available olana kadar beklenir.\nkubectl apply -f examples/basic.yaml\nkubectl get aiworkloads\n```\n\nakışını tamamlayabilir.\n\nAyrıca:\n\n* mimari README'de açıktır.\n* project scope dürüstçe açıklanır.\n* “production-ready Kubernetes platform” gibi aşırı claim yapılmaz.\n* known limitations belgelenmiştir.\n* demo gerçek reconciliation davranışını gösterir.\n* GitHub release hazırlanabilir durumdadır.\n\n- Teknik kararlar bölümündeki bütün zorunlu davranışlar uygulanmış ve aşağıdaki doğrulama senaryolarıyla kanıtlanmıştır; opsiyonel özelliklerin kararı belgelenmiştir.\n\n## 5. Adım adım doğrulama\n\n1. Projeyi bilmeyen kullanıcı akışıyla README komutlarını temiz kind ortamında sırayla uygula; eksik image/deploy/env adımı olmamalı.\n2. 16 demo adımını ve Epic Definition of Done listesini kanıt linkleriyle tek tek karşılaştır.\n3. Examples CRD validation'dan geçmeli; broken documentation link, secret placeholder ve release claim kontrolü yapılmalı.\n\n## 6. Teslim çıktıları ve kapanış kanıtı\n\nREADME, diagrams, üç example manifest, demo script, release checklist/notes ve V0 kabul kanıtı.\n\n- Değişen dosyalar ve ilgili test adları kaydedilir.\n- Çalıştırılan komutlar, ortam/sürüm ve sonuçlar eklenir; planlanan kontroller çalıştırılmış gibi raporlanmaz.\n- Kabul kriterleri kanıtla eşleştirilir. Bilinen sınırlamalar ve sonraki adım belirtilir.\n- İlgili testler davranış geliştirilirken yazılır; test-suite adımı eksik davranış testlerini sona erteleme gerekçesi değildir.\n\n## 7. Sıra, bağımlılıklar ve tahmin\n\nUygulama sırası: 16 / 16. Kaynak taslaktaki kimlik: AWC-16 (gerçek Jira anahtarı değildir).\n\nBağımlılıklar: [AWCP-15 — Adım 14](https://erayyilmmaz.atlassian.net/browse/AWCP-15), [AWCP-16 — Adım 15](https://erayyilmmaz.atlassian.net/browse/AWCP-16)\n\nEpic: [AWCP-1](https://erayyilmmaz.atlassian.net/browse/AWCP-1)\n\nBaşlangıç tahmini: 2 saat. Entegrasyon, öğrenme ve hata ayıklama süresine göre yeniden değerlendirilir; süre taahhüdü değildir.\n\n## 8. Teknik kaynaklar\n\n12 Eylül 2026 tarihinde backlog hazırlığı sırasında kullanılan resmi kaynaklar. Projede çalıştığı ayrıca testlerle doğrulanacaktır.\n\n- [kind.sigs.k8s.io/](https://kind.sigs.k8s.io/)\n- [kubernetes.io/docs/concepts/configuration/secret/](https://kubernetes.io/docs/concepts/configuration/secret/)\n- [kubernetes.io/docs/concepts/services-networking/network-policies/](https://kubernetes.io/docs/concepts/services-networking/network-policies/)",
+      "key": "AWCP-17",
+      "url": "https://erayyilmmaz.atlassian.net/browse/AWCP-17",
+      "dependsOnKeys": [
+        "AWCP-15",
+        "AWCP-16"
+      ]
+    }
+  ],
+  "verification": {
+    "issueCount": 17,
+    "storyCount": 16,
+    "blocksLinkCount": 31,
+    "allDescriptionsMatch": true,
+    "rankOrder": [
+      "AWCP-1",
+      "AWCP-2",
+      "AWCP-3",
+      "AWCP-4",
+      "AWCP-5",
+      "AWCP-6",
+      "AWCP-7",
+      "AWCP-8",
+      "AWCP-9",
+      "AWCP-10",
+      "AWCP-11",
+      "AWCP-12",
+      "AWCP-13",
+      "AWCP-14",
+      "AWCP-15",
+      "AWCP-16",
+      "AWCP-17"
+    ],
+    "sourceBulletCount": 394,
+    "sourceCorrection": "Original internet-free test claim corrected: initial dependency download may need network; prepared unit/envtest runs do not need external services.",
+    "structure": [
+      {
+        "key": "AWCP-2",
+        "order": 1,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 1,
+        "expectedFencedCodeBlocks": 1,
+        "dependencyCount": 0,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-3",
+        "order": 2,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 1,
+        "expectedFencedCodeBlocks": 1,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-4",
+        "order": 3,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 3,
+        "expectedFencedCodeBlocks": 3,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-5",
+        "order": 4,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 2,
+        "expectedFencedCodeBlocks": 2,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-6",
+        "order": 5,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 2,
+        "expectedFencedCodeBlocks": 2,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-7",
+        "order": 6,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 0,
+        "expectedFencedCodeBlocks": 0,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-8",
+        "order": 7,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 1,
+        "expectedFencedCodeBlocks": 1,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-9",
+        "order": 8,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 2,
+        "expectedFencedCodeBlocks": 2,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-10",
+        "order": 9,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 3,
+        "expectedFencedCodeBlocks": 3,
+        "dependencyCount": 4,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-11",
+        "order": 10,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 1,
+        "expectedFencedCodeBlocks": 1,
+        "dependencyCount": 2,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-12",
+        "order": 11,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 0,
+        "expectedFencedCodeBlocks": 0,
+        "dependencyCount": 5,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-13",
+        "order": 12,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 6,
+        "expectedFencedCodeBlocks": 6,
+        "dependencyCount": 7,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-14",
+        "order": 13,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 7,
+        "expectedFencedCodeBlocks": 7,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-15",
+        "order": 14,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 2,
+        "expectedFencedCodeBlocks": 2,
+        "dependencyCount": 1,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-16",
+        "order": 15,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 2,
+        "expectedFencedCodeBlocks": 2,
+        "dependencyCount": 2,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      },
+      {
+        "key": "AWCP-17",
+        "order": 16,
+        "parentCorrect": true,
+        "status": "To Do",
+        "headingCount": 8,
+        "headingsCorrect": true,
+        "renderedH2": 8,
+        "codeBlocks": 3,
+        "expectedFencedCodeBlocks": 3,
+        "dependencyCount": 2,
+        "dependenciesCorrect": true,
+        "orderedLists": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "decision": "AWCP-2",
+  "verifiedAt": "2026-09-12",
+  "evidenceLevel": "upstream source comparison and published artifact metadata; no operator build or E2E yet",
+  "module": "github.com/erayyilmmaz/ai-workload-control-plane",
+  "api": {
+    "group": "platform.example.io",
+    "version": "v1alpha1",
+    "kind": "AIWorkload",
+    "plural": "aiworkloads",
+    "scope": "Namespaced"
+  },
+  "go": {
+    "language": "1.26.0",
+    "toolchain": "1.26.8"
+  },
+  "tools": {
+    "kubebuilder": "v4.15.0",
+    "kubebuilderSourceCommit": "034c380389c00396878da8b388d42b17d55f8dd8",
+    "plugin": "go/v4",
+    "controllerRuntime": "v0.24.1",
+    "controllerTools": "v0.21.0",
+    "setupEnvtest": {
+      "module": "sigs.k8s.io/controller-runtime/tools/setup-envtest",
+      "revision": "3be3f1bf2b2fcc6b5c9510d55c6a9972294653d0",
+      "goMinimum": "1.26.0"
+    },
+    "kustomize": "v5.8.1",
+    "golangciLint": "v2.12.2",
+    "kind": "v0.33.0",
+    "kubectl": "v1.36.4"
+  },
+  "kubernetes": {
+    "minor": "1.36",
+    "kindVersion": "1.36.4",
+    "kindNodeImage": "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed",
+    "nodePlatforms": [
+      "linux/amd64",
+      "linux/arm64"
+    ],
+    "envtestVersion": "1.36.2",
+    "clientModules": {
+      "k8s.io/api": "v0.36.4",
+      "k8s.io/apimachinery": "v0.36.4",
+      "k8s.io/client-go": "v0.36.4",
+      "k8s.io/apiextensions-apiserver": "v0.36.4",
+      "k8s.io/apiserver": "v0.36.4",
+      "k8s.io/component-base": "v0.36.4",
+      "k8s.io/streaming": "v0.36.4"
+    },
+    "auxiliaryModulePolicy": "These are exact reference pins from the selected upstream graph, on independently versioned module lines. AWCP-3 resolves the complete Go graph; any MVS-required increase updates this lock and compatibility.md together.",
+    "auxiliaryModules": {
+      "k8s.io/klog/v2": "v2.140.0",
+      "k8s.io/utils": "v0.0.0-20260210185600-b8788abfbbc2",
+      "k8s.io/kube-openapi": "v0.0.0-20260317180543-43fb72c5454a"
+    }
+  },
+  "testLibraries": {
+    "ginkgo": "v2.28.0",
+    "gomega": "v1.39.1"
+  },
+  "binaryAssets": {
+    "darwin-arm64": {
+      "go": {
+        "url": "https://go.dev/dl/go1.26.8.darwin-arm64.tar.gz",
+        "sha256": "a012b25b571bd0138a03dcd25375ceba866fe5ca822f426d2c66a4de56fd3f4b",
+        "verification": "published_checksum; not downloaded or executed"
+      },
+      "kubebuilder": {
+        "url": "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v4.15.0/kubebuilder_darwin_arm64",
+        "sha256": "8a8b2806c352f3e0749d315ecea91a352b2ce9321af927fca823a1604bd3530a",
+        "verification": "published_checksum; not downloaded or executed"
+      },
+      "kind": {
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-darwin-arm64",
+        "sha256": "0c8c7dbe5e23594a198b786c4bc13dacc101fa6196b0cb0b23a1ca44e61f4b4f",
+        "verification": "published_checksum; not downloaded or executed"
+      },
+      "envtest": {
+        "url": "https://github.com/kubernetes-sigs/controller-tools/releases/download/envtest-v1.36.2/envtest-v1.36.2-darwin-arm64.tar.gz",
+        "sha256": "f344e7c70961b100471eeea4d2555006f282a6a27bece7f42fbede77b29b886e",
+        "verification": "published_checksum; not downloaded or executed"
+      },
+      "kubectl": {
+        "url": "https://dl.k8s.io/release/v1.36.4/bin/darwin/arm64/kubectl",
+        "sha256": "c9e4f713d6fee0043a3d835cca13077cda2bc0973840eb9779360df0b5bdfc69",
+        "verification": "published_checksum; not downloaded or executed"
+      }
+    },
+    "linux-amd64": {
+      "go": {
+        "url": "https://go.dev/dl/go1.26.8.linux-amd64.tar.gz",
+        "sha256": "d0f743b33e8d8945e6b1f432edd15785c70507121d6e2a723b21285eddf8b57b",
+        "verification": "published_checksum; not downloaded or executed"
+      },
+      "kubebuilder": {
+        "url": "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v4.15.0/kubebuilder_linux_amd64",
+        "sha256": "9632ba818c35e10d9664f19090972ee5d667bdffbf4b83c34e8374c5e846afa2",
+        "verification": "published_checksum; not downloaded or executed"
+      },
+      "kind": {
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64",
+        "sha256": "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d",
+        "verification": "published_checksum; not downloaded or executed"
+      },
+      "envtest": {
+        "url": "https://github.com/kubernetes-sigs/controller-tools/releases/download/envtest-v1.36.2/envtest-v1.36.2-linux-amd64.tar.gz",
+        "sha256": "5e99f4eef3d6f9d4dd063730299f708c98da8801f2f14d8fc762cb354f30c332",
+        "verification": "published_checksum; not downloaded or executed"
+      },
+      "kubectl": {
+        "url": "https://dl.k8s.io/release/v1.36.4/bin/linux/amd64/kubectl",
+        "sha256": "8b8f088da2dab964f853b38464033b1be15ede2839eca751482357c45abdd05a",
+        "verification": "published_checksum; not downloaded or executed"
+      }
+    }
+  },
+  "sources": {
+    "kubebuilderGoMod": "https://github.com/kubernetes-sigs/kubebuilder/blob/034c380389c00396878da8b388d42b17d55f8dd8/testdata/project-v4/go.mod",
+    "kubebuilderMakefile": "https://github.com/kubernetes-sigs/kubebuilder/blob/034c380389c00396878da8b388d42b17d55f8dd8/testdata/project-v4/Makefile",
+    "controllerRuntimeGoMod": "https://github.com/kubernetes-sigs/controller-runtime/blob/3be3f1bf2b2fcc6b5c9510d55c6a9972294653d0/go.mod",
+    "setupEnvtestGoMod": "https://github.com/kubernetes-sigs/controller-runtime/blob/3be3f1bf2b2fcc6b5c9510d55c6a9972294653d0/tools/setup-envtest/go.mod",
+    "kindRelease": "https://github.com/kubernetes-sigs/kind/releases/tag/v0.33.0",
+    "envtestRelease": "https://github.com/kubernetes-sigs/controller-tools/releases/tag/envtest-v1.36.2",
+    "goReleases": "https://go.dev/dl/?mode=json&include=all"
+  }
+}
