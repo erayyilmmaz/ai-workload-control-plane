@@ -1,0 +1,10 @@
+.tools/
+bin/
+dist/
+cover.out
+*.test
+.DS_Store
+.env
+.env.*
+!.env.example
+test/e2e/artifacts/

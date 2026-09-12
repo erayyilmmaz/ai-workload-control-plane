@@ -24,6 +24,10 @@ These are design/source checks. A statement such as “the controller never muta
 
 ## Story sequence and test ownership
 
+AWCP-3's repository foundation is now implemented; see its
+[acceptance and execution evidence](verification/AWCP-3.md) and
+[development guide](development.md). Later rows remain planned work.
+
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |
 | 01 / AWC-1 | AWCP-2 | Scope, architecture, exact baseline, ADR-001..008 | Document/source/asset review | None |

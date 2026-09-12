@@ -2,7 +2,7 @@
 
 A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
 
-**Stage: architecture baseline (AWCP-2). The operator is not implemented or installable yet.**
+**Stage: repository/bootstrap (AWCP-3). The manager is buildable; workload behavior is not implemented yet.**
 
 An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
 
@@ -27,7 +27,20 @@ flowchart LR
 5. [Architecture decision records](docs/adr/README.md)
 6. [Acceptance and backlog traceability](docs/traceability.md)
 
-The machine-readable selection is [toolchain.lock.json](toolchain.lock.json). This pins the design baseline; `go.mod` and `go.sum` will be generated and resolved in AWCP-3.
+The machine-readable selection is [toolchain.lock.json](toolchain.lock.json); exact runtime/test dependencies are resolved in `go.mod` and `go.sum`. See [local setup and commands](docs/development.md) before running anything.
+
+```bash
+make bootstrap
+make verify
+make test-race
+make docker-build
+make smoke
+```
+
+Bootstrap installs checksum-verified tools into this checkout. The smoke test uses
+only its own temporary kind cluster and kubeconfig, then removes them. Initial
+tool/image downloads need network access. Full prerequisites and test boundaries
+are in the development guide.
 
 ## V0 boundaries
 
@@ -39,8 +52,14 @@ This is an alpha portfolio project, not a production-ready platform. An `AIWorkl
 
 ## Development status
 
-The first milestone defines the resource contract and records upstream version/asset evidence. No controller build, container execution, envtest, kind E2E, hosted CI or release is claimed at this stage. See [AWCP-2 evidence](docs/verification/AWCP-2.md).
+AWCP-2 defines the intended resource contract; AWCP-3 adds the Kubebuilder project,
+read-only controller, namespace-scoped manager, local tooling, tests and container.
+The current `AIWorkload.spec` is intentionally empty. No child resources or workload
+status are produced. Metrics, application lifecycle E2E, hosted CI and releases
+remain future work. See [AWCP-2 design evidence](docs/verification/AWCP-2.md) and
+[AWCP-3 execution evidence](docs/verification/AWCP-3.md).
 
-The next milestone is [AWCP-3 — repository and Kubebuilder bootstrap](https://erayyilmmaz.atlassian.net/browse/AWCP-3). Installation commands will be added when they can actually run. Each completed development step is validated, committed and pushed before moving on.
+The next milestone is [AWCP-4 — AIWorkload API and CRD contract](https://erayyilmmaz.atlassian.net/browse/AWCP-4).
+Each completed development step is validated, committed and pushed before moving on.
 
 The [original Jira backlog export](docs/backlog/awcp-v0.md) is a dated planning snapshot. Current architecture documents and the version lock supersede its provisional choices; corrections are listed in the compatibility document.

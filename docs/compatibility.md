@@ -2,7 +2,9 @@
 
 Decision date: 2026-09-12. Machine-readable source: [toolchain.lock.json](../toolchain.lock.json).
 
-**Evidence level: tagged upstream source inspection and published artifact availability/checksums. No generated project build or runtime test has been performed in AWCP-2.**
+**AWCP-2 evidence was source/metadata-only. AWCP-3 adds local byte verification,
+resolved modules and executable checks; exact outcomes are in
+[AWCP-3 evidence](verification/AWCP-3.md). Unexecuted platforms remain unverified.**
 
 ## Selected versions
 
@@ -23,7 +25,14 @@ Decision date: 2026-09-12. Machine-readable source: [toolchain.lock.json](../too
 | golangci-lint | v2.12.2 | Scaffold pin; source's Go minimum is 1.25.0; build using selected Go 1.26.8 |
 | Ginkgo / Gomega | v2.28.0 / v1.39.1 | Selected scaffold test dependency versions |
 
-The v0.36.4 family is `k8s.io/api`, `apimachinery`, `client-go`, `apiextensions-apiserver`, `apiserver`, `component-base` and `streaming`. Do not assign that version to independent `k8s.io/*` modules. Their reference pins are klog/v2 v2.140.0, utils v0.0.0-20260210185600-b8788abfbbc2 and kube-openapi v0.0.0-20260317180543-43fb72c5454a. AWCP-3 must resolve the complete module graph and record any required transitive version changes in go.mod/go.sum and this lock.
+The v0.36.4 family is `k8s.io/api`, `apimachinery`, `client-go`, `apiextensions-apiserver`, `apiserver`, `component-base` and `streaming`. Do not assign that version to independent `k8s.io/*` modules. Their resolved pins remain klog/v2 v2.140.0, utils v0.0.0-20260210185600-b8788abfbbc2 and kube-openapi v0.0.0-20260317180543-43fb72c5454a. AWCP-3 resolved all seven family modules to v0.36.4 and verified the module checksums. `make tidy` preserves family pins even for lazy-loaded members not compiled by the bootstrap.
+
+The patch resolution also selected newer transitive x/net v0.56.0, x/sys v0.46.0,
+x/text v0.39.0, x/tools v0.47.0 and structured-merge-diff/v6 v6.3.3. The full graph
+is recorded in go.mod/go.sum; generator/linter dependencies are separately built
+and do not override the runtime graph. Actual v4.15.0 CLI templates initially
+resolved Ginkgo v2.27.4/Gomega v1.39.0 (different from the tagged sample inspected
+in AWCP-2); the project explicitly normalizes them to v2.28.0/v1.39.1.
 
 The lock is a version decision and published-artifact record, not a substitute for Go's module checksum database or a claim that binaries have been downloaded and verified locally. Build tools in their own dependency context; do not force generator dependencies into the operator's runtime module graph.
 
@@ -48,7 +57,10 @@ The release introduction says “defaults to Kubernetes 1.36.1”, while its det
 | envtest v1.36.2 | Native tarball listed | Native tarball listed | controller-tools release asset digest |
 | kind node v1.36.4 | Linux ARM64 image via Docker | Linux AMD64 image | Upstream release lists multi-architecture image digest |
 
-All exact asset URLs and SHA-256 values are in the lock. These are published metadata, not local content-verification results. During bootstrap, download to a project-local tool directory, compare bytes against the recorded digest, and execute the native binary. Linux artifacts cannot be runtime-tested directly by a Darwin process.
+All exact asset URLs and SHA-256 values are in the lock. AWCP-3 downloaded all five
+darwin-arm64 assets, verified their bytes and executed native version/process
+checks. Linux AMD64 archive entries are still published metadata only; Linux
+artifacts cannot be runtime-tested directly by a Darwin process.
 
 envtest 1.36.2 and kind 1.36.4 intentionally share minor 1.36 but use different available patch artifacts. Envtest validates API behavior; kind validates real cluster behavior. No broader Kubernetes minor support is claimed. First preparation may need network access; prepared unit/envtest runs do not call external AI services.
 
@@ -79,6 +91,25 @@ AWCP-3 bootstrap entry point, after installing the exact tools, is `kubebuilder 
 Pin exact versions; no `latest`, `1.36.x`, floating branch or wildcard tool selectors in reproducible workflows. An update must change the lock, local/CI configuration and this matrix together, then run generation, build, relevant unit/envtest and kind tests. Library minimums, source compatibility, asset availability and executed runtime compatibility are separate claims.
 
 The local host currently exposes Docker, kind, kubectl, Node and Python on PATH; Go, Kubebuilder, standalone Kustomize and golangci-lint were not found on PATH during AWCP-2. Installation and process execution belong to AWCP-3. No user's global toolchain, Docker cluster or kubeconfig was changed by this design milestone.
+
+## AWCP-3 bootstrap adaptations
+
+Go and all build tools are now project-local under `.tools/`. `Makefile` uses an
+explicit Go executable path for compatibility with macOS Make 3.81 and checkout
+paths containing spaces. Controller-gen scans only `api` and `internal/controller`,
+not the nested tool module cache. Go's standard `./...` test/package commands
+already exclude dot-prefixed directories.
+
+The bootstrap is single-namespace and read-only; primary/status mutation and
+child-resource permissions are not granted before those features exist. Both
+namespace settings are mandatory, leader election defaults on, health is process
+liveness, readiness waits for cache sync and leader-scoped startup. Metrics and
+webhook servers are not exposed. Only one manager replica is supported.
+
+The builder and runtime images are digest-pinned in Dockerfile and the lock:
+Go 1.26.8 bookworm (`9fdc884a…`) and distroless static nonroot (`1c2c046b…`).
+The full digests came from registry OCI indexes on 2026-09-12. Container tests do
+not imply a published image, multi-architecture execution or a vulnerability audit.
 
 ## Sources
 

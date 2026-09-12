@@ -1,0 +1,7 @@
+# Bootstrap fixture only. Does not deploy an application until later stories.
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: bootstrap-sample
+  namespace: awcp-workloads
+spec: {}

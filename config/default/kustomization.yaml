@@ -1,0 +1,8 @@
+# Bootstrap-only installation; no namespace transformer: the two scopes differ.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - ../crd
+  - ../rbac
+  - ../manager
