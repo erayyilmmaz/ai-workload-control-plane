@@ -1,0 +1,18 @@
+{
+  "apiVersion": "platform.example.io/v1alpha1",
+  "kind": "AIWorkload",
+  "metadata": {
+    "name": "unsupported-resource"
+  },
+  "spec": {
+    "image": "example.invalid/app:v1",
+    "container": {
+      "port": 8080
+    },
+    "resources": {
+      "requests": {
+        "nvidia.com/gpu": "1"
+      }
+    }
+  }
+}

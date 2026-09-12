@@ -1,0 +1,10 @@
+{
+  "apiVersion": "platform.example.io/v1alpha1",
+  "kind": "AIWorkload",
+  "metadata": {
+    "name": "missing-container"
+  },
+  "spec": {
+    "image": "example.invalid/app:v1"
+  }
+}

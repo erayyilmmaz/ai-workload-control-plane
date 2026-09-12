@@ -1,29 +1,51 @@
 # AIWorkload API and status contract
 
-Accepted design for AWCP-2. Types/schema are implemented in AWCP-4; controller behavior arrives in later stories.
+Types, structural schema, defaults and admission tests implemented in AWCP-4.
+Lifecycle/status production remains accepted design from AWCP-2, implemented in later stories.
 
 ## API identity
 
 `platform.example.io/v1alpha1`, kind `AIWorkload`, plural `aiworkloads`, namespaced scope. The Go module is `github.com/erayyilmmaz/ai-workload-control-plane`. `platform.example.io` is an intentional portfolio API group, not a claim to own a production domain. Changing the group later is a migration, not a silent rename.
 
-One served/storage version is planned, with a `/status` subresource. No conversion/defaulting/validation webhook is introduced. Structural OpenAPI schema, defaults and CEL handle the supported declarative validation. The manager does not write spec to apply defaults.
+One served/storage version and the `/status` subresource are implemented. No conversion/defaulting/validation webhook is introduced. Structural OpenAPI schema, defaults and CEL handle declarative validation. The manager does not write spec to apply defaults.
 
 ## Field decisions
 
 | Path | V0 contract |
 | --- | --- |
-| spec.image | Required non-blank image reference; public or locally available non-root image |
+| spec.image | Required string, 1..2048 characters, no whitespace (including Unicode space); image availability/non-root execution are runtime concerns |
 | spec.replicas | Integer, default 1, range 0..20; explicit 0 is preserved |
 | spec.container.port | Required integer 1..65535; named container port `http`, TCP |
-| spec.resources | Optional CPU/memory requests and limits; map to Kubernetes ResourceRequirements |
+| spec.resources | Optional requests/limits maps, only cpu/memory keys, quoted quantity strings of 1..64 characters; future builders convert to native ResourceRequirements |
 | spec.health.readiness.path | Optional block; if present path is non-empty and starts with `/` |
 | spec.health.liveness.path | Same rule; no probe when its block is omitted |
 | spec.service.enabled | Default true; explicit false is preserved even with defaulted siblings |
 | spec.service.port | Default 80, range 1..65535; ClusterIP TCP only, targetPort `http` |
-| spec.secretRefs | Default empty ordered list of unique, valid Secret names from the CR namespace |
+| spec.secretRefs | Default empty ordered list, at most 32 unique Secret DNS-subdomain names of 1..253 characters, from the CR namespace |
 | spec.network.enabled | Default true; same-namespace ingress to container TCP port; no egress isolation |
 
-Resource quantities must be parseable and non-negative. If a request and its limit are both present, request must not exceed limit. Use schema/CEL where the selected Kubernetes version can validate quantities correctly; do not compare quantity strings lexicographically. If a rule cannot be expressed reliably at the CR API, detect it before child creation or map the child API rejection to `InvalidConfiguration` without retry storms. Such an API validation boundary must be documented and covered in AWCP-4.
+Resource quantities must be parseable and non-negative. CEL `isQuantity`, `quantity`
+and `compareTo` enforce these rules and request <= corresponding limit on Kubernetes
+1.36. Tests include `900m <= 1`, `1024Mi == 1Gi`, exponent notation, zero and invalid
+units/negative/over-limit values. Quantities are strings in this public API: quote
+integer-looking YAML values. JSON numbers are rejected. CPU/memory keys are validated
+as map keys, so unsupported resources are rejected rather than silently pruned.
+
+This is not complete Pod admission validation: CPU precision, LimitRange defaults,
+ResourceQuota and cluster policies remain child-API concerns. When child creation
+is implemented, its validation rejection must become `InvalidConfiguration` rather
+than a retry storm. AWCP-4 creates no children and does not claim that later error
+mapping is implemented. Missing resource keys remain absent in the CR; no fabricated
+requests or limits are inserted. Collection/string bounds constrain CEL validation
+cost as well as API payload size.
+
+Optional nested service/network blocks default to `{}` so child defaults also apply
+when the entire block is omitted. Pointer fields in Go distinguish omission from
+explicit `replicas: 0` or `enabled: false`; those values survive serialization and
+admission. Optional non-nullable fields supplied as null follow Kubernetes pruning/
+defaulting rules, not a third boolean state. Container and container.port are required.
+Health blocks have no defaults; each present probe requires a path of 1..2048
+characters starting with `/`. Empty `health: {}` enables neither probe.
 
 Readiness defaults: initialDelaySeconds 0, periodSeconds 5, timeoutSeconds 1, failureThreshold 3, successThreshold 1. Liveness defaults: initialDelaySeconds 10, periodSeconds 10, timeoutSeconds 1, failureThreshold 3, successThreshold 1. Both use HTTP and the named `http` container port. These timing knobs are fixed implementation defaults in V0, not extra API fields.
 
@@ -47,9 +69,22 @@ The generated NetworkPolicy has policyTypes=[Ingress], selects only the CR UID/n
 | desiredReplicas | Current desired replicas from spec |
 | readyReplicas | Observed Deployment readyReplicas, zero if Deployment is missing |
 | endpoint | `<child>.<namespace>.svc:<service-port>` if enabled and present; otherwise empty |
-| conditions | `metav1.Condition` list, map keyed by type |
+| conditions | At most 16 `metav1.Condition` entries, map keyed by type; duplicate types rejected |
 
 Every condition includes type, status, reason, message, observedGeneration and lastTransitionTime. Unknown observations use status `Unknown`; do not manufacture a healthy state before inspection. lastTransitionTime changes only when the condition's status value changes. A reason/message/generation change can require a status patch without resetting transition time.
+
+The schema requires each condition's observedGeneration in addition to the standard
+metav1.Condition fields. Observed/ready/desired counts cannot be negative; desired
+replicas is at most 20. readyReplicas has no 20 ceiling because a rolling update may
+temporarily include a surge replica. Endpoint is bounded to 512 characters. No status
+field is defaulted. Controllers own its semantic accuracy; admission does not compare
+observedGeneration to live workload state. The [synthetic status fixture](../test/fixtures/status.yaml)
+is round-tripped via `/status` by tests; it is not a real readiness report.
+
+Writes to `/status` cannot modify spec or advance generation. Main-resource creation
+discards supplied status, and ordinary spec updates preserve existing status and
+advance generation for spec changes. These are real API-server tests, with no AWCP
+controller running. The controller still has no status write permission in this step.
 
 | Evaluated state | Ready | Progressing | Degraded | Primary reason |
 | --- | --- | --- | --- | --- |
@@ -75,15 +110,30 @@ The endpoint is service discovery information, not a health certificate. The `.s
 
 ## Compatibility and validation fixtures
 
-Unknown fields are pruned under the structural schema by default. Strict field validation requests must reject unknown fields. Document both behaviors; do not treat default pruning as strict typo rejection.
+Unknown fields are pruned under the structural schema with Ignore (or Warn, which
+also reports warnings). `fieldValidation=Strict` rejects them with BadRequest; clients
+must actually send that option. In controller-runtime v0.24.1 use
+`client.CreateOptions{FieldValidation: "Strict"}` rather than setting only Raw, which
+is overwritten. Tests submit the same `spec.contaner` typo in both modes, proving
+rejection versus pruning. There is no preserve-unknown-fields escape hatch for PodSpec.
 
-Required fixtures: valid minimal spec; all-fields spec; explicit zero/false; blank image; replicas -1 and 21; ports 0 and 65536; invalid quantity/request-limit relation; invalid health path; duplicate/malformed Secret references; unknown fields in both validation modes; status writes separated from spec writes. Examples will be checked against the generated CRD in AWCP-4, not represented as already validated here.
+The [minimal sample](../config/samples/platform_v1alpha1_aiworkload.yaml),
+[full sample](../config/samples/aiworkload_full.yaml), 29 standalone invalid manifests
+and [validation field index](../test/fixtures/invalid/index.json) are exercised by
+`make test-envtest`. The full sample's image and Secrets are placeholders, not
+downloaded credentials or a runnable demo. The default sample Kustomization includes
+only the minimal object; the full sample can be applied explicitly.
+
+`kubectl explain aiworkload.spec` and its image field return authored descriptions.
+Server-generated printer columns are NAME (Kubernetes metadata), READY, REPLICAS
+(desired spec count), IMAGE and AGE. Missing Ready status is deliberately blank.
 
 No breaking alpha schema change is silent: update schema, examples, compatibility notes and fixtures together. Later API conversion or production group migration is a separate decision.
 
 ## References
 
 - [Custom resource validation and status](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/)
+- [CEL quantity library](https://kubernetes.io/docs/reference/using-api/cel/#kubernetes-quantity-library)
 - [Deployment progression](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
 - [HTTP probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
 - [Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)

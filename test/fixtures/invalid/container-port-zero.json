@@ -1,0 +1,13 @@
+{
+  "apiVersion": "platform.example.io/v1alpha1",
+  "kind": "AIWorkload",
+  "metadata": {
+    "name": "container-port-zero"
+  },
+  "spec": {
+    "image": "example.invalid/app:v1",
+    "container": {
+      "port": 0
+    }
+  }
+}

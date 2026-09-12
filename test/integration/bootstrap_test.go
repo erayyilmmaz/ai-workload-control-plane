@@ -75,6 +75,7 @@ var _ = Describe("Bootstrap with a real API and etcd", func() {
 
 	It("registers the namespaced API, syncs only its namespace and preserves status", func() {
 		workload := &platformv1alpha1.AIWorkload{ObjectMeta: metav1.ObjectMeta{Name: "bootstrap", Namespace: "awcp-workloads"}}
+		workload.Spec = platformv1alpha1.AIWorkloadSpec{Image: "example.invalid/app:v1", Container: platformv1alpha1.ContainerSpec{Port: 8080}}
 		Expect(api.Create(ctx, workload)).To(Succeed())
 		Expect(workload.UID).NotTo(BeEmpty())
 		key := client.ObjectKeyFromObject(workload)
@@ -83,7 +84,8 @@ var _ = Describe("Bootstrap with a real API and etcd", func() {
 		}, 10*time.Second).Should(Succeed())
 		workload.Status.Conditions = []metav1.Condition{{
 			Type: "BootstrapTest", Status: metav1.ConditionTrue, Reason: "TestFixture",
-			Message: "Synthetic schema round-trip only", LastTransitionTime: metav1.Now(),
+			ObservedGeneration: workload.Generation,
+			Message:            "Synthetic schema round-trip only", LastTransitionTime: metav1.Now(),
 		}}
 		Expect(api.Status().Update(ctx, workload)).To(Succeed())
 		Eventually(func(g Gomega) {
@@ -93,6 +95,7 @@ var _ = Describe("Bootstrap with a real API and etcd", func() {
 			g.Expect(cached.Status.Conditions[0].Reason).To(Equal("TestFixture"))
 		}, 10*time.Second).Should(Succeed())
 		outside := &platformv1alpha1.AIWorkload{ObjectMeta: metav1.ObjectMeta{Name: "outside", Namespace: "outside"}}
+		outside.Spec = workload.Spec
 		Expect(api.Create(ctx, outside)).To(Succeed())
 		Expect(mgr.GetCache().Get(ctx, client.ObjectKeyFromObject(outside), &platformv1alpha1.AIWorkload{})).NotTo(Succeed())
 		var list platformv1alpha1.AIWorkloadList

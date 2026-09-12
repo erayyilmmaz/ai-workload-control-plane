@@ -1,7 +1,10 @@
-# Bootstrap fixture only. Does not deploy an application until later stories.
+# Valid API fixture only. Controller does not deploy applications yet.
 apiVersion: platform.example.io/v1alpha1
 kind: AIWorkload
 metadata:
   name: bootstrap-sample
   namespace: awcp-workloads
-spec: {}
+spec:
+  image: ghcr.io/example/demo-agent:v1
+  container:
+    port: 8080

@@ -14,7 +14,20 @@ spec:
     singular: aiworkload
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Ready
+      type: string
+    - jsonPath: .spec.replicas
+      name: Replicas
+      type: integer
+    - jsonPath: .spec.image
+      name: Image
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: AIWorkload is the Schema for the aiworkloads API
@@ -38,14 +51,174 @@ spec:
             type: object
           spec:
             description: spec defines the desired state of AIWorkload
+            properties:
+              container:
+                description: Container declares the required HTTP TCP port, named
+                  http in generated Pods.
+                properties:
+                  port:
+                    description: Port is required and becomes the TCP container port
+                      named http.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                required:
+                - port
+                type: object
+              health:
+                description: Health enables only explicitly present readiness/liveness
+                  HTTP probe blocks.
+                properties:
+                  liveness:
+                    description: Liveness detects an unhealthy process; omitted means
+                      no liveness probe.
+                    properties:
+                      path:
+                        description: Path must start with /. V0 timing is fixed and
+                          documented in docs/api-contract.md.
+                        maxLength: 2048
+                        minLength: 1
+                        pattern: ^/
+                        type: string
+                    required:
+                    - path
+                    type: object
+                  readiness:
+                    description: Readiness gates traffic; omitted means no readiness
+                      probe.
+                    properties:
+                      path:
+                        description: Path must start with /. V0 timing is fixed and
+                          documented in docs/api-contract.md.
+                        maxLength: 2048
+                        minLength: 1
+                        pattern: ^/
+                        type: string
+                    required:
+                    - path
+                    type: object
+                type: object
+              image:
+                description: |-
+                  Image is the container image reference. Whitespace is forbidden; registry
+                  availability and full OCI reference validity are checked at workload runtime.
+                maxLength: 2048
+                minLength: 1
+                pattern: ^[^[:space:]\p{Z}\x{0085}]+$
+                type: string
+              network:
+                default: {}
+                description: Network enables same-namespace ingress policy generation;
+                  it does not isolate egress.
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled defaults to true; false disables only this
+                      workload's generated policy.
+                    type: boolean
+                type: object
+              replicas:
+                default: 1
+                description: Replicas is the desired count; zero intentionally scales
+                  the application down.
+                format: int32
+                maximum: 20
+                minimum: 0
+                type: integer
+              resources:
+                description: Resources supports only CPU and memory requests/limits,
+                  as quoted quantities.
+                properties:
+                  limits:
+                    additionalProperties:
+                      description: ResourceQuantity is a quoted Kubernetes quantity,
+                        e.g. 100m or 128Mi.
+                      maxLength: 64
+                      minLength: 1
+                      type: string
+                      x-kubernetes-validations:
+                      - message: quantity must be parseable and non-negative
+                        rule: isQuantity(self) && !quantity(self).isLessThan(quantity('0'))
+                    description: Limits caps CPU/memory. A matching request cannot
+                      exceed the limit.
+                    maxProperties: 2
+                    type: object
+                    x-kubernetes-validations:
+                    - message: only cpu and memory resources are supported
+                      rule: self.all(k, k in ['cpu', 'memory'])
+                  requests:
+                    additionalProperties:
+                      description: ResourceQuantity is a quoted Kubernetes quantity,
+                        e.g. 100m or 128Mi.
+                      maxLength: 64
+                      minLength: 1
+                      type: string
+                      x-kubernetes-validations:
+                      - message: quantity must be parseable and non-negative
+                        rule: isQuantity(self) && !quantity(self).isLessThan(quantity('0'))
+                    description: Requests reserves CPU/memory. Omitted keys remain
+                      absent at this API layer.
+                    maxProperties: 2
+                    type: object
+                    x-kubernetes-validations:
+                    - message: only cpu and memory resources are supported
+                      rule: self.all(k, k in ['cpu', 'memory'])
+                type: object
+                x-kubernetes-validations:
+                - message: each request must not exceed its corresponding limit
+                  rule: '!has(self.requests) || !has(self.limits) || self.requests.all(k,
+                    !(k in self.limits) || !isQuantity(self.requests[k]) || !isQuantity(self.limits[k])
+                    || quantity(self.requests[k]).compareTo(quantity(self.limits[k]))
+                    <= 0)'
+              secretRefs:
+                default: []
+                description: |-
+                  SecretRefs contains ordered, unique Secret names in this CR's namespace.
+                  Later envFrom entries win on overlapping keys. Values are never part of this API.
+                items:
+                  description: SecretReference is a Kubernetes DNS-subdomain Secret
+                    name, not a payload or cross-namespace path.
+                  maxLength: 253
+                  minLength: 1
+                  pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                  type: string
+                maxItems: 32
+                type: array
+                x-kubernetes-list-type: atomic
+                x-kubernetes-validations:
+                - message: secretRefs must not contain duplicate names
+                  rule: self.all(x, self.filter(y, y == x).size() == 1)
+              service:
+                default: {}
+                description: Service configures an optional ClusterIP Service targeting
+                  the named http port.
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled defaults to true; explicit false suppresses
+                      the Service.
+                    type: boolean
+                  port:
+                    default: 80
+                    description: Port is the Service TCP port; it targets container
+                      port http.
+                    format: int32
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                type: object
+            required:
+            - container
+            - image
             type: object
           status:
             description: status defines the observed state of AIWorkload
             properties:
               conditions:
                 description: |-
-                  Conditions retains the scaffold's standard status shape. The bootstrap
-                  controller does not publish conditions or claim workload readiness.
+                  Conditions are controller observations keyed by type. No Ready value is defaulted.
+                  Every written condition must identify the generation it evaluated.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -100,10 +273,37 @@ spec:
                   - status
                   - type
                   type: object
+                maxItems: 16
                 type: array
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: every condition must include observedGeneration
+                  rule: self.all(c, has(c.observedGeneration))
+              desiredReplicas:
+                description: DesiredReplicas is the desired count observed in spec.
+                format: int32
+                maximum: 20
+                minimum: 0
+                type: integer
+              endpoint:
+                description: Endpoint is service discovery (<child>.<namespace>.svc:<port>),
+                  not health proof.
+                maxLength: 512
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the CR generation evaluated, not
+                  proof of rollout success.
+                format: int64
+                minimum: 0
+                type: integer
+              readyReplicas:
+                description: ReadyReplicas is the observed Deployment ready count
+                  (including possible surge).
+                format: int32
+                minimum: 0
+                type: integer
             type: object
         required:
         - spec

@@ -1,0 +1,21 @@
+{
+  "apiVersion": "platform.example.io/v1alpha1",
+  "kind": "AIWorkload",
+  "metadata": {
+    "name": "cpu-request-over-limit"
+  },
+  "spec": {
+    "image": "example.invalid/app:v1",
+    "container": {
+      "port": 8080
+    },
+    "resources": {
+      "requests": {
+        "cpu": "2"
+      },
+      "limits": {
+        "cpu": "1500m"
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "apiVersion": "platform.example.io/v1alpha1",
+  "kind": "AIWorkload",
+  "metadata": {
+    "name": "empty-image"
+  },
+  "spec": {
+    "image": "",
+    "container": {
+      "port": 8080
+    }
+  }
+}

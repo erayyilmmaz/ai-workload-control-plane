@@ -1,9 +1,9 @@
-# Local development — AWCP-3 bootstrap
+# Local development — API contract stage
 
 This checkout contains a real, buildable Kubebuilder scaffold. It is **not yet a
-workload operator**: `spec` is empty, reconciliation only reads the primary, and
+workload operator**: spec/status and validation are defined, but reconciliation only reads the primary, and
 no Deployment/Service/ServiceAccount/NetworkPolicy or status is produced. Never
-use the empty sample as an application deployment. AWCP-4 defines the API next.
+use the contract samples as an application deployment. AWCP-5 adds reconciliation next.
 
 ## Prerequisites and first setup
 
@@ -50,7 +50,7 @@ cached module archives, so **bootstrap itself is not an offline workflow**.
 | `make vet` / `make lint` | Go vet, selected static linters and formatting checks |
 | `make fmt` / `make lint-fix` | Explicit formatting/fix commands (mutate source) |
 | `make test-unit` | Fast `-short` tests; envtest is explicitly skipped |
-| `make test-envtest` | Real API/etcd integration suite only |
+| `make test-envtest` | Manager integration plus controller-independent API contract suite |
 | `make test` | Full `go test -count=1 ./...`, including envtest |
 | `make test-race` | Full tests with Go race detector |
 | `make render` | Validate Kustomize references and write ignored `dist/install.yaml` |
@@ -96,6 +96,9 @@ failure rather than retrying a failed shutdown away.
   single-replica manager, restricted security, probes, namespace settings, pinned images.
 - Envtest: actual CRD registration, namespaced create/status round-trip, cache
   visibility and exclusion, a Lease in the manager namespace, graceful shutdown.
+- AWCP-4 contract envtest (no AWCP manager): defaults, zero/false preservation,
+  quantity CEL, valid/invalid fixtures, Strict vs pruning, status/spec isolation,
+  generation behavior, kubectl explain and server printer columns.
 - Kind smoke: image UID 65532, restricted runtime security, real health/readiness,
   manager rollout, leadership and positive/negative bootstrap authorization.
 

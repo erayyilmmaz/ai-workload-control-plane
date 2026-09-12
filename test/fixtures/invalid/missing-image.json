@@ -1,0 +1,12 @@
+{
+  "apiVersion": "platform.example.io/v1alpha1",
+  "kind": "AIWorkload",
+  "metadata": {
+    "name": "missing-image"
+  },
+  "spec": {
+    "container": {
+      "port": 8080
+    }
+  }
+}

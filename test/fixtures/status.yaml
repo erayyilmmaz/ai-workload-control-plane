@@ -1,0 +1,24 @@
+# Synthetic status for schema tests, not a claim about a running workload.
+observedGeneration: 4
+desiredReplicas: 2
+readyReplicas: 2
+endpoint: awcp-demo-agent-0123456789abcdef.default.svc:80
+conditions:
+  - type: Ready
+    status: "True"
+    reason: WorkloadReady
+    message: Current generation is ready.
+    observedGeneration: 4
+    lastTransitionTime: "2026-09-12T09:00:00Z"
+  - type: Progressing
+    status: "False"
+    reason: WorkloadReady
+    message: Rollout is complete.
+    observedGeneration: 4
+    lastTransitionTime: "2026-09-12T09:00:00Z"
+  - type: Degraded
+    status: "False"
+    reason: WorkloadReady
+    message: No blocking failure is observed.
+    observedGeneration: 4
+    lastTransitionTime: "2026-09-12T09:00:00Z"

@@ -1,0 +1,118 @@
+[
+  {
+    "file": "missing-image.json",
+    "field": "spec.image"
+  },
+  {
+    "file": "empty-image.json",
+    "field": "spec.image"
+  },
+  {
+    "file": "blank-image.json",
+    "field": "spec.image"
+  },
+  {
+    "file": "unicode-blank-image.json",
+    "field": "spec.image"
+  },
+  {
+    "file": "missing-container.json",
+    "field": "spec.container"
+  },
+  {
+    "file": "missing-container-port.json",
+    "field": "spec.container.port"
+  },
+  {
+    "file": "replicas-negative.json",
+    "field": "spec.replicas"
+  },
+  {
+    "file": "replicas-too-large.json",
+    "field": "spec.replicas"
+  },
+  {
+    "file": "container-port-zero.json",
+    "field": "spec.container.port"
+  },
+  {
+    "file": "container-port-too-large.json",
+    "field": "spec.container.port"
+  },
+  {
+    "file": "service-port-zero.json",
+    "field": "spec.service.port"
+  },
+  {
+    "file": "service-port-too-large.json",
+    "field": "spec.service.port"
+  },
+  {
+    "file": "duplicate-secrets.json",
+    "field": "spec.secretRefs"
+  },
+  {
+    "file": "empty-secret.json",
+    "field": "spec.secretRefs"
+  },
+  {
+    "file": "invalid-secret.json",
+    "field": "spec.secretRefs"
+  },
+  {
+    "file": "secret-too-long.json",
+    "field": "spec.secretRefs"
+  },
+  {
+    "file": "too-many-secrets.json",
+    "field": "spec.secretRefs"
+  },
+  {
+    "file": "readiness-path.json",
+    "field": "spec.health.readiness.path"
+  },
+  {
+    "file": "liveness-path-empty.json",
+    "field": "spec.health.liveness.path"
+  },
+  {
+    "file": "probe-missing-path.json",
+    "field": "spec.health.readiness.path"
+  },
+  {
+    "file": "malformed-cpu.json",
+    "field": "spec.resources.requests"
+  },
+  {
+    "file": "negative-memory.json",
+    "field": "spec.resources.limits"
+  },
+  {
+    "file": "negative-cpu.json",
+    "field": "spec.resources.requests"
+  },
+  {
+    "file": "cpu-request-over-limit.json",
+    "field": "spec.resources"
+  },
+  {
+    "file": "memory-request-over-limit.json",
+    "field": "spec.resources"
+  },
+  {
+    "file": "unsupported-resource.json",
+    "field": "spec.resources.requests"
+  },
+  {
+    "file": "numeric-quantity.json",
+    "field": "spec.resources.requests.cpu"
+  },
+  {
+    "file": "empty-quantity.json",
+    "field": "spec.resources.requests"
+  },
+  {
+    "file": "quantity-too-long.json",
+    "field": "spec.resources.requests"
+  }
+]

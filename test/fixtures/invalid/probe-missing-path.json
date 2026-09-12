@@ -1,0 +1,16 @@
+{
+  "apiVersion": "platform.example.io/v1alpha1",
+  "kind": "AIWorkload",
+  "metadata": {
+    "name": "probe-missing-path"
+  },
+  "spec": {
+    "image": "example.invalid/app:v1",
+    "container": {
+      "port": 8080
+    },
+    "health": {
+      "readiness": {}
+    }
+  }
+}

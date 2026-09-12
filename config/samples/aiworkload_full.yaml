@@ -1,0 +1,31 @@
+# Contract example only: image availability and Secret contents are not verified.
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: demo-agent
+  namespace: awcp-workloads
+spec:
+  image: ghcr.io/example/demo-agent:v1
+  replicas: 2
+  container:
+    port: 8080
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  health:
+    readiness:
+      path: /ready
+    liveness:
+      path: /health
+  service:
+    enabled: true
+    port: 80
+  secretRefs:
+    - agent-api-secrets
+    - agent-overrides
+  network:
+    enabled: true

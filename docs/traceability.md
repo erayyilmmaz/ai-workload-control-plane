@@ -26,7 +26,9 @@ These are design/source checks. A statement such as “the controller never muta
 
 AWCP-3's repository foundation is now implemented; see its
 [acceptance and execution evidence](verification/AWCP-3.md) and
-[development guide](development.md). Later rows remain planned work.
+[development guide](development.md).
+[AWCP-4](verification/AWCP-4.md) now implements the API schema and contract tests;
+AWCP-5 onward remain planned.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |
@@ -68,6 +70,10 @@ Each behavior gets relevant tests while it is implemented. AWCP-13 consolidates 
 
 ## Handoff and completion protocol
 
-For every development step: read the actual Jira description and current repository, implement only that step, run meaningful checks, record commands/outcomes/limitations, then commit and push. The user authorized commit + push after each step on 2026-09-12. Verify local HEAD equals the remote branch SHA before reporting a successful push. Do not use force-push or rewrite history as part of this routine.
+For every development step: read the user-provided task description and current repository, implement only that step, run meaningful checks, record commands/outcomes/limitations, then commit and push. The user authorized commit + push after each step on 2026-09-12. Verify local HEAD equals the remote branch SHA before reporting a successful push. Do not use force-push or rewrite history as part of this routine.
+
+Starting with AWCP-4 the user supplies the Jira description and updates Jira
+personally. Do not read or update Jira unless explicitly requested again; return
+the completion evidence here and in the repository.
 
 Jira progress is not a replacement for Git/test evidence. No unexecuted check is recorded as passing. A later step may revise an accepted design only with a documented reason and updates to affected tests/contracts.

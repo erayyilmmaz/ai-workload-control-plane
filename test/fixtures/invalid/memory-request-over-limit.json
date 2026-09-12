@@ -1,0 +1,21 @@
+{
+  "apiVersion": "platform.example.io/v1alpha1",
+  "kind": "AIWorkload",
+  "metadata": {
+    "name": "memory-request-over-limit"
+  },
+  "spec": {
+    "image": "example.invalid/app:v1",
+    "container": {
+      "port": 8080
+    },
+    "resources": {
+      "requests": {
+        "memory": "1Gi"
+      },
+      "limits": {
+        "memory": "1000Mi"
+      }
+    }
+  }
+}
