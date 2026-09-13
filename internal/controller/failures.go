@@ -103,6 +103,9 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 	if changed && r.Recorder != nil {
 		r.Recorder.Eventf(p, nil, corev1.EventTypeWarning, reason, "Reconcile", message)
 	}
+	if r.Telemetry != nil {
+		r.Telemetry.RecordFailure(reason)
+	}
 	if permanent {
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}

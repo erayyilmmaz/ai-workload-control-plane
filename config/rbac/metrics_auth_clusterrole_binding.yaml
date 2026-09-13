@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: awcp-metrics-auth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: awcp-metrics-auth
+subjects:
+  - kind: ServiceAccount
+    name: awcp-controller-manager
+    namespace: awcp-system

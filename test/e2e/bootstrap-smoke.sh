@@ -2,7 +2,7 @@
 # Manager/container plus identity/Deployment/Service/NetworkPolicy/status-contract smoke; traffic enforcement E2E requires a CNI profile.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-image="${1:-awcp-manager:awcp-10}"
+image="${1:-awcp-manager:awcp-11}"
 for tool in kind kubectl; do
   test -x ".tools/bin/$tool" || bash hack/bootstrap-tools.sh "$tool"
 done
@@ -95,6 +95,9 @@ workload_uid="$("$kubectl" -n awcp-workloads get "aiworkload/$workload" -o jsonp
   .spec.policyTypes == ["Ingress"] and
   .spec.ingress == [{from:[{podSelector:{}}], ports:[{protocol:"TCP", port:"http"}]}] and
   .spec.egress == null'
+"$kubectl" -n awcp-system get service awcp-controller-metrics -o json | jq -e '
+  .spec.selector == {"app.kubernetes.io/name":"awcp-controller-manager"} and
+  .spec.ports == [{name:"https-metrics", protocol:"TCP", port:8443, targetPort:"metrics"}]'
 endpoint="$child.awcp-workloads.svc:80"
 i=0
 while test "$i" -lt 30; do
@@ -124,6 +127,9 @@ for rule in 'get secrets' 'create deployments.apps' 'create events.events.k8s.io
   # Intentional splitting of resource/verb pairs.
   test "$("$kubectl" auth can-i $rule -n awcp-workloads --as="$identity")" = yes
 done
+for rule in 'create tokenreviews.authentication.k8s.io' 'create subjectaccessreviews.authorization.k8s.io'; do
+  test "$("$kubectl" auth can-i $rule --as="$identity")" = yes
+done
 test "$("$kubectl" auth can-i patch aiworkloads.platform.example.io --subresource=status -n awcp-workloads --as="$identity")" = yes
 for rule in 'create secrets' 'delete deployments.apps' 'delete serviceaccounts' 'update aiworkloads.platform.example.io'; do
   # Word splitting intentionally supplies verb/resource from these fixed cases.
@@ -138,4 +144,4 @@ done
 answer="$("$kubectl" auth can-i get aiworkloads.platform.example.io -n default --as="$identity" || true)"
 test "$answer" = no
 "$kubectl" -n awcp-system logs deployment/awcp-controller-manager --tail=30
-echo 'PASS: manager security, health/readiness, Lease, identity/Deployment/Service/NetworkPolicy/status contracts, endpoint and least-privilege RBAC'
+echo 'PASS: manager security, health/readiness, metrics Service, Lease, identity/Deployment/Service/NetworkPolicy/status contracts, endpoint and least-privilege RBAC'

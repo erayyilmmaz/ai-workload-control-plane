@@ -6,3 +6,5 @@ resources:
   - role_binding.yaml
   - leader_election_role.yaml
   - leader_election_role_binding.yaml
+  - metrics_auth_clusterrole.yaml
+  - metrics_auth_clusterrole_binding.yaml

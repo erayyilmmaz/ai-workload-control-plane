@@ -1,0 +1,76 @@
+# Optional alternative to direct Prometheus scraping. Apply explicitly; this is not
+# part of config/default and therefore cannot affect controller reconciliation.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: awcp-otel-collector
+  namespace: awcp-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: awcp-otel-collector-metrics-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: awcp-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: awcp-otel-collector
+    namespace: awcp-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: awcp-otel-collector
+  namespace: awcp-system
+data:
+  config.yaml: |
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: awcp-controller
+              scheme: https
+              bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                insecure_skip_verify: true
+              static_configs:
+                - targets: [awcp-controller-metrics.awcp-system.svc:8443]
+    exporters:
+      debug:
+        verbosity: basic
+    service:
+      pipelines:
+        metrics:
+          receivers: [prometheus]
+          exporters: [debug]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: awcp-otel-collector
+  namespace: awcp-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: awcp-otel-collector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: awcp-otel-collector
+    spec:
+      serviceAccountName: awcp-otel-collector
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:0.160.0
+          args: [--config=/conf/config.yaml]
+          volumeMounts:
+            - name: config
+              mountPath: /conf
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: awcp-otel-collector

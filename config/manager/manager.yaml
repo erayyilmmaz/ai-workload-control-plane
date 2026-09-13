@@ -26,11 +26,12 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: awcp-manager:awcp-3
+          image: awcp-manager:awcp-11
           imagePullPolicy: IfNotPresent
           args:
             - --leader-elect=true
             - --health-probe-bind-address=:8081
+            - --metrics-bind-address=:8443
           env:
             - name: WATCH_NAMESPACE
               value: awcp-workloads
@@ -46,6 +47,11 @@ spec:
           ports:
             - name: health
               containerPort: 8081
+            - name: metrics
+              containerPort: 8443
+          volumeMounts:
+            - name: metrics-certs
+              mountPath: /tmp/k8s-metrics-server/serving-certs
           livenessProbe:
             httpGet:
               path: /healthz
@@ -63,3 +69,6 @@ spec:
             limits:
               cpu: 500m
               memory: 128Mi
+      volumes:
+        - name: metrics-certs
+          emptyDir: {}

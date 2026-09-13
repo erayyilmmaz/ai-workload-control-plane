@@ -17,6 +17,7 @@ func main() {
 		ManagerNamespace: os.Getenv("MANAGER_NAMESPACE"),
 	}
 	flag.StringVar(&options.ProbeAddress, "health-probe-bind-address", ":8081", "Health/readiness address")
+	flag.StringVar(&options.MetricsBindAddress, "metrics-bind-address", ":8443", "Authenticated HTTPS metrics address")
 	flag.BoolVar(&options.LeaderElection, "leader-elect", true, "Enable manager leader election")
 	logOptions := zap.Options{Development: false}
 	logOptions.BindFlags(flag.CommandLine)

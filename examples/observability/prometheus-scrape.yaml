@@ -1,0 +1,13 @@
+# Mount this fragment into an existing Prometheus configuration. It is not included
+# in the base AWCP installation and needs a ServiceAccount bound to /metrics access.
+scrape_configs:
+  - job_name: awcp-controller
+    scheme: https
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tls_config:
+      # The base manager uses a self-signed serving certificate. Replace with a
+      # trusted certificate before enabling certificate verification in production.
+      insecure_skip_verify: true
+    static_configs:
+      - targets:
+          - awcp-controller-metrics.awcp-system.svc:8443

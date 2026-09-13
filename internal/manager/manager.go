@@ -16,11 +16,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	platformv1alpha1 "github.com/erayyilmmaz/ai-workload-control-plane/api/v1alpha1"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/controller"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/resource"
+	"github.com/erayyilmmaz/ai-workload-control-plane/internal/telemetry"
 )
 
 // Options are explicit so out-of-cluster runs cannot silently expand scope.
@@ -28,7 +30,9 @@ type Options struct {
 	WatchNamespace   string
 	ManagerNamespace string
 	ProbeAddress     string
-	LeaderElection   bool
+	// MetricsBindAddress is disabled for library/tests when empty; cmd/main enables :8443.
+	MetricsBindAddress string
+	LeaderElection     bool
 	// ControllerName defaults to aiworkload; tests use unique names for sequential managers.
 	ControllerName string
 	// Builder overrides the production plan in tests; nil uses WorkloadBuilder.
@@ -56,6 +60,10 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 	if options.Builder == nil {
 		options.Builder = resource.WorkloadBuilder{}
 	}
+	metricsAddress := options.MetricsBindAddress
+	if metricsAddress == "" {
+		metricsAddress = "0"
+	}
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		return nil, err
@@ -67,7 +75,7 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                        scheme,
 		Cache:                         cache.Options{DefaultNamespaces: map[string]cache.Config{options.WatchNamespace: {}}},
-		Metrics:                       metricsserver.Options{BindAddress: "0"}, // Authenticated metrics belong to AWCP-11.
+		Metrics:                       metricsserver.Options{BindAddress: metricsAddress, SecureServing: metricsAddress != "0", FilterProvider: filters.WithAuthenticationAndAuthorization},
 		HealthProbeBindAddress:        options.ProbeAddress,
 		LeaderElection:                options.LeaderElection,
 		LeaderElectionID:              "awcp-controller.platform.example.io",
@@ -79,13 +87,16 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 		return nil, err
 	}
 	if err = (&controller.AIWorkloadReconciler{
-		Client: mgr.GetClient(), WatchNamespace: options.WatchNamespace, Builder: options.Builder, ControllerName: options.ControllerName,
+		Client: mgr.GetClient(), WatchNamespace: options.WatchNamespace, Builder: options.Builder, ControllerName: options.ControllerName, Telemetry: telemetry.Default(),
 	}).SetupWithManager(mgr); err != nil {
 		return nil, err
 	}
 	// +kubebuilder:scaffold:builder
 	ready := &startupReadiness{cache: mgr.GetCache()}
 	if err = mgr.Add(ready); err != nil {
+		return nil, err
+	}
+	if err = mgr.Add(&telemetry.GaugeRefresher{Reader: mgr.GetCache(), Namespace: options.WatchNamespace, Metrics: telemetry.Default()}); err != nil {
 		return nil, err
 	}
 	if err = mgr.AddHealthzCheck("process", healthz.Ping); err != nil {

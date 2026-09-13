@@ -20,6 +20,7 @@ import (
 
 	platformv1alpha1 "github.com/erayyilmmaz/ai-workload-control-plane/api/v1alpha1"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/resource"
+	"github.com/erayyilmmaz/ai-workload-control-plane/internal/telemetry"
 )
 
 // AIWorkloadReconciler executes pure plans; a nil Builder deliberately creates no children.
@@ -30,6 +31,7 @@ type AIWorkloadReconciler struct {
 	Scheme         *runtime.Scheme
 	Builder        resource.Builder
 	Recorder       events.EventRecorder
+	Telemetry      telemetry.Recorder
 }
 
 // +kubebuilder:rbac:groups=platform.example.io,namespace=awcp-workloads,resources=aiworkloads,verbs=get;list;watch
@@ -68,7 +70,13 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			var outcome Outcome
 			outcome, err = engine.Apply(ctx, &workload, intent)
 			if err != nil {
+				if r.Telemetry != nil {
+					r.Telemetry.RecordResource(childKind(intent.Object), "error")
+				}
 				break
+			}
+			if r.Telemetry != nil {
+				r.Telemetry.RecordResource(childKind(intent.Object), string(outcome))
 			}
 			logger.V(1).Info("Reconciled child", "kind", childOrder(intent.Object), "outcome", outcome)
 		}
@@ -86,6 +94,21 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return r.reportFailure(ctx, &workload, err)
 	}
 	return ctrl.Result{}, nil
+}
+
+func childKind(object client.Object) string {
+	switch childOrder(object) {
+	case 0:
+		return "ServiceAccount"
+	case 1:
+		return "Deployment"
+	case 2:
+		return "Service"
+	case 3:
+		return "NetworkPolicy"
+	default:
+		return "Unknown"
+	}
 }
 
 // SetupWithManager registers the primary watch with the namespace-scoped cache.

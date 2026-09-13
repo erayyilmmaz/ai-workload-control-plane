@@ -1,0 +1,10 @@
+# Bind this ClusterRole only to the Prometheus/Collector ServiceAccount that scrapes AWCP.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: awcp-metrics-reader
+rules:
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get

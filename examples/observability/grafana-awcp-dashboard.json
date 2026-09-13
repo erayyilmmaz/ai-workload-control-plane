@@ -1,0 +1,16 @@
+{
+  "title": "AI Workload Control Plane",
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "version": 1,
+  "panels": [
+    {"title": "Reconcile rate", "type": "timeseries", "targets": [{"expr": "sum(rate(controller_runtime_reconcile_total{controller=\"aiworkload\"}[5m]))"}]},
+    {"title": "Reconcile errors", "type": "timeseries", "targets": [{"expr": "sum(rate(controller_runtime_reconcile_errors_total{controller=\"aiworkload\"}[5m]))"}]},
+    {"title": "Reconcile p95 duration", "type": "timeseries", "targets": [{"expr": "histogram_quantile(0.95, sum(rate(controller_runtime_reconcile_time_seconds_bucket{controller=\"aiworkload\"}[5m])) by (le))"}]},
+    {"title": "Managed workloads", "type": "stat", "targets": [{"expr": "awcp_controller_managed_workloads"}]},
+    {"title": "Ready workloads", "type": "stat", "targets": [{"expr": "awcp_controller_ready_workloads"}]},
+    {"title": "Degraded workloads", "type": "stat", "targets": [{"expr": "awcp_controller_degraded_workloads"}]},
+    {"title": "Controller CPU", "type": "timeseries", "targets": [{"expr": "sum(rate(process_cpu_seconds_total{job=\"awcp-controller\"}[5m]))"}]},
+    {"title": "Controller memory", "type": "timeseries", "targets": [{"expr": "process_resident_memory_bytes{job=\"awcp-controller\"}"}]}
+  ]
+}

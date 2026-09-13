@@ -1,11 +1,12 @@
-# Local development — observed workload status stage
+# Local development — controller observability stage
 
 This checkout contains a real, buildable workload operator. The manager reconciles one
 guarded Deployment, optional cluster-local Service, dedicated tokenless ServiceAccount
 and ingress-only NetworkPolicy. It publishes generation-aware readiness from Deployment
 status, validates referenced Secret metadata and reports a missing prerequisite without
-reading Secret payloads. Samples still use placeholder images, so never use them as an
-application deployment.
+reading Secret payloads. It exposes authenticated HTTPS metrics at `:8443/metrics`;
+Prometheus, Grafana and Collector remain explicit optional examples. Samples still use
+placeholder images, so never use them as an application deployment.
 
 ## Prerequisites and first setup
 
@@ -141,7 +142,7 @@ escalation, uses RuntimeDefault seccomp and a read-only root filesystem; the
 manager needs no writable mount. Its ServiceAccount token remains mounted because
 it must contact Kubernetes. Future workload identities are a separate boundary.
 
-`IMG` defaults to `awcp-manager:awcp-10`; override it consistently for build/smoke.
+`IMG` defaults to `awcp-manager:awcp-11`; override it consistently for build/smoke.
 `REVISION` defaults to the current Git HEAD; before a source commit it identifies
 the parent, not the uncommitted source. Rebuild with the committed revision when
 producing an attributable image. The local image is not a published release.
@@ -167,7 +168,7 @@ Safe packaging/install/uninstall workflows are AWCP-15's deliverable.
 | `api/v1alpha1/*_types.go`, `groupversion_info.go` | Initially scaffolded, now project-owned source |
 | `cmd`, `internal`, `test`, other `config` files, Dockerfile/Makefile | Project-owned bootstrap adaptations with tests |
 | `internal/resource` | Builder/Intent contract and naming; production mappings pending |
-| `internal/telemetry` | Reserved boundary; not an implemented feature |
+| `internal/telemetry` | Bounded controller metrics and cache-derived workload gauges |
 | `docs/backlog/*` | Original dated planning snapshot, not a live status board |
 
 Scaffold provenance: checksum-verified Kubebuilder v4.15.0, go/v4, generated in a
@@ -180,9 +181,10 @@ documents were preserved. The tagged sample and CLI template differ in Ginkgo/
 Gomega patch versions; both are explicitly normalized to the accepted lock.
 
 The generated generic README, AGENTS guide, CI/devcontainer, webhook/cert-manager,
-Prometheus and cluster-wide permission examples were not copied. The manager
-factory lives in `internal/manager` for lifecycle tests. Authenticated metrics are
-deferred to AWCP-11, not exposed anonymously by the bootstrap.
+Prometheus and Collector are optional examples rather than base dependencies. The
+manager factory lives in `internal/manager` for lifecycle tests. AWCP-11 exposes
+authenticated metrics; its narrowly scoped cluster permissions are limited to
+TokenReview and SubjectAccessReview requests.
 
 ## References
 
