@@ -10,12 +10,12 @@ uninstall="$release_dir/awcp-operator-uninstall.yaml"
 checksums="$release_dir/SHA256SUMS"
 
 test -s "$install" && test -s "$operator" && test -s "$uninstall" && test -s "$checksums"
-rg -q '^kind: CustomResourceDefinition$' "$install"
-! rg -q '^kind: (Deployment|Namespace)$' "$install"
-rg -q '^kind: Deployment$' "$operator"
-rg -q '^kind: CustomResourceDefinition$' "$operator"
-rg -q '^kind: Namespace$' "$operator"
-rg -q '^kind: Deployment$' "$uninstall"
-! rg -q '^kind: (CustomResourceDefinition|Namespace)$' "$uninstall"
-test "$(rg -c 'awcp-.*\.yaml$' "$checksums")" = 3
+grep -Eq '^kind: CustomResourceDefinition$' "$install"
+! grep -Eq '^kind: (Deployment|Namespace)$' "$install"
+grep -Eq '^kind: Deployment$' "$operator"
+grep -Eq '^kind: CustomResourceDefinition$' "$operator"
+grep -Eq '^kind: Namespace$' "$operator"
+grep -Eq '^kind: Deployment$' "$uninstall"
+! grep -Eq '^kind: (CustomResourceDefinition|Namespace)$' "$uninstall"
+test "$(grep -Ec 'awcp-.*\.yaml$' "$checksums")" = 3
 echo 'PASS: release CRD/operator/uninstall packages are complete and uninstall excludes CRDs and Namespaces'
