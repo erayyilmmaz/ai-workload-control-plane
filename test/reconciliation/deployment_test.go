@@ -151,14 +151,19 @@ func TestProductionDeployment(t *testing.T) {
 	}
 	update := func(t *testing.T, p *platform.AIWorkload, change func(*platform.AIWorkload)) *appsv1.Deployment {
 		t.Helper()
-		if err := api.Get(ctx, client.ObjectKeyFromObject(p), p); err != nil {
-			t.Fatal(err)
+		for attempt := 0; attempt < 5; attempt++ {
+			if err := api.Get(ctx, client.ObjectKeyFromObject(p), p); err != nil {
+				t.Fatal(err)
+			}
+			change(p)
+			if err := api.Update(ctx, p); err == nil {
+				return converged(t, p)
+			} else if !apierrors.IsConflict(err) {
+				t.Fatal(err)
+			}
 		}
-		change(p)
-		if err := api.Update(ctx, p); err != nil {
-			t.Fatal(err)
-		}
-		return converged(t, p)
+		t.Fatal("primary status updates kept conflicting with spec update")
+		return nil
 	}
 	current := converged(t, alpha)
 	other := converged(t, beta)
@@ -434,7 +439,8 @@ func TestProductionDeployment(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if degraded == nil || degraded.Status != metav1.ConditionFalse || ready == nil || ready.Status != metav1.ConditionUnknown || strings.Contains(string(serialized), sentinel) || actual.Generation != generation {
+				progressing := meta.FindStatusCondition(actual.Status.Conditions, "Progressing")
+				if degraded == nil || degraded.Status != metav1.ConditionFalse || ready == nil || ready.Status != metav1.ConditionFalse || ready.Reason != "Reconciling" || progressing == nil || progressing.Status != metav1.ConditionTrue || strings.Contains(string(serialized), sentinel) || actual.Generation != generation {
 					return errors.New("Secret recovery or status redaction has not converged")
 				}
 				return nil
@@ -449,6 +455,88 @@ func TestProductionDeployment(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertRecovered()
+	})
+	t.Run("status reducer requires a current Deployment rollout", func(t *testing.T) {
+		workload := create("status-reducer")
+		deployment := converged(t, workload)
+		key := client.ObjectKeyFromObject(workload)
+		conditionError := func(conditions []metav1.Condition, typ string, status metav1.ConditionStatus, reason string) error {
+			condition := meta.FindStatusCondition(conditions, typ)
+			if condition == nil || condition.Status != status || condition.Reason != reason {
+				return errors.New("condition does not match expected status")
+			}
+			return nil
+		}
+		setDeploymentStatus := func(observedGeneration int64, ready int32) {
+			t.Helper()
+			for attempt := 0; attempt < 5; attempt++ {
+				if err := api.Get(ctx, keyFor(workload), deployment); err != nil {
+					t.Fatal(err)
+				}
+				deployment.Status = appsv1.DeploymentStatus{
+					ObservedGeneration: observedGeneration, UpdatedReplicas: ready, Replicas: ready, ReadyReplicas: ready, AvailableReplicas: ready,
+					Conditions: []appsv1.DeploymentCondition{{Type: appsv1.DeploymentAvailable, Status: corev1.ConditionTrue}},
+				}
+				if err := api.Status().Update(ctx, deployment); err == nil {
+					return
+				} else if !apierrors.IsConflict(err) {
+					t.Fatal(err)
+				}
+			}
+			t.Fatal("Deployment status updates kept conflicting")
+		}
+		setDeploymentStatus(deployment.Generation, 1)
+		var readyStatus platform.AIWorkload
+		eventually(t, "current Deployment ready status", func() error {
+			if err := api.Get(ctx, key, &readyStatus); err != nil {
+				return err
+			}
+			ready := meta.FindStatusCondition(readyStatus.Status.Conditions, "Ready")
+			progressing := meta.FindStatusCondition(readyStatus.Status.Conditions, "Progressing")
+			degraded := meta.FindStatusCondition(readyStatus.Status.Conditions, "Degraded")
+			if ready == nil || ready.Status != metav1.ConditionTrue || ready.Reason != "WorkloadReady" || progressing == nil || progressing.Status != metav1.ConditionFalse || degraded == nil || degraded.Status != metav1.ConditionFalse || readyStatus.Status.ObservedGeneration != readyStatus.Generation || readyStatus.Status.DesiredReplicas != 1 || readyStatus.Status.ReadyReplicas != 1 {
+				return errors.New("current rollout status has not converged")
+			}
+			return nil
+		})
+		stableRV := readyStatus.ResourceVersion
+		stableTransition := meta.FindStatusCondition(readyStatus.Status.Conditions, "Ready").LastTransitionTime
+		time.Sleep(300 * time.Millisecond)
+		if err := api.Get(ctx, key, &readyStatus); err != nil {
+			t.Fatal(err)
+		}
+		if readyStatus.ResourceVersion != stableRV || !meta.FindStatusCondition(readyStatus.Status.Conditions, "Ready").LastTransitionTime.Equal(&stableTransition) {
+			t.Fatal("unchanged status rewrote the primary or transition time")
+		}
+		deployment = update(t, workload, func(p *platform.AIWorkload) { p.Spec.Image = "example.invalid/status-reducer:v2" })
+		eventually(t, "old Deployment status is not ready for new generation", func() error {
+			if err := api.Get(ctx, key, &readyStatus); err != nil {
+				return err
+			}
+			ready := meta.FindStatusCondition(readyStatus.Status.Conditions, "Ready")
+			progressing := meta.FindStatusCondition(readyStatus.Status.Conditions, "Progressing")
+			if ready == nil || ready.Status != metav1.ConditionFalse || ready.Reason != "Reconciling" || progressing == nil || progressing.Status != metav1.ConditionTrue || readyStatus.Status.ObservedGeneration != readyStatus.Generation {
+				return errors.New("old rollout was incorrectly reported ready")
+			}
+			return nil
+		})
+		setDeploymentStatus(deployment.Generation, 1)
+		eventually(t, "new Deployment generation ready", func() error {
+			if err := api.Get(ctx, key, &readyStatus); err != nil {
+				return err
+			}
+			return conditionError(readyStatus.Status.Conditions, "Ready", metav1.ConditionTrue, "WorkloadReady")
+		})
+		deployment = update(t, workload, func(p *platform.AIWorkload) { p.Spec.Replicas = ptr.To(int32(0)) })
+		eventually(t, "scaled to zero status", func() error {
+			if err := api.Get(ctx, key, &readyStatus); err != nil {
+				return err
+			}
+			if readyStatus.Status.DesiredReplicas != 0 || conditionError(readyStatus.Status.Conditions, "Ready", metav1.ConditionFalse, "ScaledToZero") != nil || conditionError(readyStatus.Status.Conditions, "Progressing", metav1.ConditionFalse, "ScaledToZero") != nil || conditionError(readyStatus.Status.Conditions, "Degraded", metav1.ConditionFalse, "ScaledToZero") != nil {
+				return errors.New("scale-to-zero status has not converged")
+			}
+			return nil
+		})
 	})
 	t.Run("replicas 1 to 2 to 0 does not change template", func(t *testing.T) {
 		template := current.Spec.Template.DeepCopy()

@@ -33,8 +33,8 @@ watch wiring. [AWCP-6](verification/AWCP-6.md) activates the production Deployme
 mapping; [AWCP-7](verification/AWCP-7.md) activates optional ClusterIP Service
 mapping and the discovery endpoint; [AWCP-8](verification/AWCP-8.md) activates
 dedicated identity and Secret missing/restore decisions; [AWCP-9](verification/AWCP-9.md)
-activates standard ingress-only NetworkPolicy generation. Full observed readiness
-remains a later milestone.
+activates standard ingress-only NetworkPolicy generation; [AWCP-10](verification/AWCP-10.md)
+activates generation-aware conditions, readiness and bounded Events.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |

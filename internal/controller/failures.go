@@ -76,7 +76,12 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 		permanent = true
 	}
 	before := p.DeepCopy()
-	for _, typ := range []string{"Ready", "Progressing", "Degraded"} {
+	if apierrors.IsNotFound(cause) {
+		// A missing observed child has no ready replicas; never preserve a stale
+		// healthy count while reporting the failed observation.
+		p.Status.ReadyReplicas = 0
+	}
+	for _, typ := range []string{conditionReady, conditionProgressing, conditionDegraded} {
 		value := metav1.ConditionUnknown
 		if permanent {
 			value = metav1.ConditionFalse
@@ -87,8 +92,9 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 		meta.SetStatusCondition(&p.Status.Conditions, metav1.Condition{Type: typ, Status: value, Reason: reason, Message: message, ObservedGeneration: p.Generation})
 	}
 	p.Status.ObservedGeneration = p.Generation
-	if p.Spec.Replicas != nil {
-		p.Status.DesiredReplicas = *p.Spec.Replicas
+	p.Status.DesiredReplicas = desiredReplicas(p)
+	if !resource.ServiceEnabled(p) {
+		p.Status.Endpoint = ""
 	}
 	changed, err := r.patchStatus(ctx, before, p)
 	if err != nil {
@@ -101,31 +107,6 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 		return ctrl.Result{RequeueAfter: time.Minute}, nil
 	}
 	return ctrl.Result{}, retryError(cause)
-}
-
-// Recovery clears only this foundation's failure marker, never declares a workload Ready.
-func (r *AIWorkloadReconciler) clearFailure(ctx context.Context, p *platformv1alpha1.AIWorkload) error {
-	c := meta.FindStatusCondition(p.Status.Conditions, "Degraded")
-	if c == nil || (c.Reason != "ResourceOwnershipConflict" && c.Reason != "InvalidConfiguration" && c.Reason != "ReconcileFailed" && c.Reason != "SecretNotFound") {
-		return nil
-	}
-	before := p.DeepCopy()
-	for _, typ := range []string{"Ready", "Progressing", "Degraded"} {
-		value := metav1.ConditionUnknown
-		if typ == "Progressing" {
-			value = metav1.ConditionTrue
-		}
-		if typ == "Degraded" {
-			value = metav1.ConditionFalse
-		}
-		meta.SetStatusCondition(&p.Status.Conditions, metav1.Condition{Type: typ, Status: value, Reason: "Reconciling", Message: "Resource plan applied; workload readiness has not been evaluated.", ObservedGeneration: p.Generation})
-	}
-	p.Status.ObservedGeneration = p.Generation
-	if p.Spec.Replicas != nil {
-		p.Status.DesiredReplicas = *p.Spec.Replicas
-	}
-	_, err := r.patchStatus(ctx, before, p)
-	return err
 }
 
 func (r *AIWorkloadReconciler) patchStatus(ctx context.Context, before, after *platformv1alpha1.AIWorkload) (bool, error) {

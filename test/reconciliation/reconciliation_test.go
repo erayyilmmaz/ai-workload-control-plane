@@ -13,6 +13,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -351,12 +352,19 @@ func TestReconciliationWithRealAPI(t *testing.T) {
 			t.Fatal("unrelated parent enqueued")
 		}
 		count = b.count(alpha.Name)
-		if err := api.Get(ctx, client.ObjectKeyFromObject(alpha), alpha); err != nil {
-			t.Fatal(err)
-		}
-		alpha.Status.ReadyReplicas = 9
-		if err := api.Status().Update(ctx, alpha); err != nil {
-			t.Fatal(err)
+		for attempt := 0; attempt < 5; attempt++ {
+			var statusOnly platform.AIWorkload
+			if err := api.Get(ctx, client.ObjectKeyFromObject(alpha), &statusOnly); err != nil {
+				t.Fatal(err)
+			}
+			statusOnly.Status.ReadyReplicas = 9
+			if err := api.Status().Update(ctx, &statusOnly); err == nil {
+				break
+			} else if !apierrors.IsConflict(err) {
+				t.Fatal(err)
+			} else if attempt == 4 {
+				t.Fatal("controller status patch kept conflicting with status-only test update")
+			}
 		}
 		time.Sleep(300 * time.Millisecond)
 		if b.count(alpha.Name) != count {

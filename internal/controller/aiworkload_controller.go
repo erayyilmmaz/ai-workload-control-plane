@@ -4,7 +4,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -81,34 +80,12 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}
 	if err != nil {
-		// A disabled Service must not leave stale discovery data even when its
-		// deletion is blocked by a foreign owner or another apply failure.
-		if !resource.ServiceEnabled(&workload) {
-			if statusErr := r.syncServiceEndpoint(ctx, &workload, ""); statusErr != nil {
-				return ctrl.Result{}, retryError(statusErr)
-			}
-		}
 		return r.reportFailure(ctx, &workload, err)
 	}
-	if err = r.syncServiceEndpoint(ctx, &workload, resource.ServiceEndpoint(&workload)); err != nil {
-		return ctrl.Result{}, retryError(err)
-	}
-	if err = r.clearFailure(ctx, &workload); err != nil {
-		return ctrl.Result{}, retryError(err)
+	if err = r.observeAndReportStatus(ctx, &workload); err != nil {
+		return r.reportFailure(ctx, &workload, err)
 	}
 	return ctrl.Result{}, nil
-}
-
-func (r *AIWorkloadReconciler) syncServiceEndpoint(ctx context.Context, workload *platformv1alpha1.AIWorkload, endpoint string) error {
-	if workload.Status.Endpoint == endpoint {
-		return nil
-	}
-	before := workload.DeepCopy()
-	workload.Status.Endpoint = endpoint
-	if _, err := r.patchStatus(ctx, before, workload); err != nil {
-		return fmt.Errorf("patch Service endpoint: %w", err)
-	}
-	return nil
 }
 
 // SetupWithManager registers the primary watch with the namespace-scoped cache.

@@ -122,6 +122,7 @@ are intentional failure inputs, validated/mapped in envtest. Their comments stat
 identity and image prerequisites. Do not apply capacity-failure fixtures to shared
 clusters. CrashLoop/readiness/quota/deadline rows above are diagnostic expectations,
 **not executed lifecycle results**. Real runtime failures/rollout and healthy
-recovery are later kind E2E work; AWCP-10 maps observed failures into full status.
+recovery are later kind E2E work; AWCP-10 maps observed Deployment rollout state into
+the documented status conditions.
 
 See [AWCP-6 execution evidence](verification/AWCP-6.md).

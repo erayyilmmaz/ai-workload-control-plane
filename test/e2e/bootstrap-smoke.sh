@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Manager/container plus identity/Deployment/Service/NetworkPolicy-contract smoke; traffic enforcement E2E requires a CNI profile.
+# Manager/container plus identity/Deployment/Service/NetworkPolicy/status-contract smoke; traffic enforcement E2E requires a CNI profile.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-image="${1:-awcp-manager:awcp-9}"
+image="${1:-awcp-manager:awcp-10}"
 for tool in kind kubectl; do
   test -x ".tools/bin/$tool" || bash hack/bootstrap-tools.sh "$tool"
 done
@@ -104,6 +104,12 @@ while test "$i" -lt 30; do
   sleep 1
 done
 test "${actual_endpoint:-}" = "$endpoint"
+"$kubectl" -n awcp-workloads get "aiworkload/$workload" -o json | jq -e '
+  .status.observedGeneration == .metadata.generation and
+  .status.desiredReplicas == 1 and
+  ([.status.conditions[]? | select(.type == "Ready" and .status == "False" and (.reason == "Reconciling" or .reason == "DeploymentUnavailable"))] | length == 1) and
+  ([.status.conditions[]? | select(.type == "Progressing" and .status == "True")] | length == 1) and
+  ([.status.conditions[]? | select(.type == "Degraded" and .status == "False")] | length == 1)'
 "$kubectl" -n awcp-workloads get "serviceaccount/$child" -o json | jq -e --arg child "$child" --arg uid "$workload_uid" '
   .metadata.ownerReferences == [{apiVersion:"platform.example.io/v1alpha1", kind:"AIWorkload", name:"bootstrap-sample", uid:$uid, controller:true, blockOwnerDeletion:false}] and
   .automountServiceAccountToken == false and
@@ -132,4 +138,4 @@ done
 answer="$("$kubectl" auth can-i get aiworkloads.platform.example.io -n default --as="$identity" || true)"
 test "$answer" = no
 "$kubectl" -n awcp-system logs deployment/awcp-controller-manager --tail=30
-echo 'PASS: manager security, health/readiness, Lease, identity/Deployment/Service/NetworkPolicy contracts, endpoint and least-privilege RBAC'
+echo 'PASS: manager security, health/readiness, Lease, identity/Deployment/Service/NetworkPolicy/status contracts, endpoint and least-privilege RBAC'

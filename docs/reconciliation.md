@@ -70,16 +70,16 @@ not every future production field mapping.
 | Conflict / AlreadyExists / Forbidden / timeout / throttling / unexpected error | Sanitized distinct error category; controller-runtime per-key retry/backoff |
 | Invalid plan/API Invalid or foreign ownership | Failure conditions and Warning Event; normal 60-second retry plus watch events |
 | Unchanged failure | No repeated status patch or explicit Event emission |
-| Recovery after foundation failure | Degraded=False, Progressing=True, Ready=Unknown; no application-readiness claim |
+| Recovery after foundation failure | Fresh Deployment observation; Reconciling or WorkloadReady conditions, not a synthetic recovery success |
 
 Errors retain their cause through `Unwrap` without putting arbitrary API error
 bodies in log/status/Event text. Failure status records observed generation and
 desired replicas. Ready/Progressing are Unknown on transient failure and False
 on configuration/ownership failure; Degraded is True. When a Service intent applies
-successfully, AWCP-7 publishes its deterministic in-cluster endpoint; disabling
-Service clears a stale endpoint even if a guarded delete reports a conflict.
-Endpoint and readyReplicas are otherwise not health observations: consumers must
-check conditions and observedGeneration. The complete reducer is AWCP-10. Status patches use optimistic
+successfully, AWCP-10 observes the current owned Deployment before reporting status.
+It publishes desired/ready replica counts, endpoint, and a consistent Ready/
+Progressing/Degraded triple; disabling Service clears a stale endpoint. Endpoint
+remains discovery information, not a health observation. Status patches use optimistic
 locking and transition timestamps remain stable for unchanged condition status.
 
 If a status write is denied or conflicts, that error is returned for retry; a
