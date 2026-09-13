@@ -49,7 +49,7 @@ activates generation-aware conditions, readiness and bounded Events.
 | 09 / AWC-9 | AWCP-10 | Status, generation gates, reason/event model | Truth-table unit + no-op/status envtest | AWCP-6, 7, 8, 9 |
 | 10 / AWC-10 | AWCP-11 | Metrics, structured logs, dashboard, Collector example | Counter/gauge/outage checks and dashboard demo | AWCP-5, 10 |
 | 11 / AWC-11 | AWCP-12 | Delete guards and ownership lifecycle | Guard/race unit tests; kind GC and Secret-survival smoke | AWCP-6, 7, 8, 9, 10 |
-| 12 / AWC-12 | AWCP-13 | Consolidated regression/coverage suite | Unit + real API envtest, race where supported | AWCP-6 through 12 |
+| 12 / AWC-12 | AWCP-13 | Consolidated regression/coverage suite | Unit + real API envtest, bounded deletion guard, project-only atomic coverage, race where supported | AWCP-6 through 12 |
 | 13 / AWC-13 | AWCP-14 | Isolated kind harness, demo image, diagnostics/cleanup | Real rollout, scale, drift, Secret recovery, service traffic, GC | AWCP-13 |
 | 14 / AWC-14 | AWCP-15 | Kustomize package, install/uninstall guide | Install/upgrade/undeploy + explicit cleanup checks | AWCP-14 |
 | 15 / AWC-15 | AWCP-16 | GitHub Actions and supply-chain policy | Hosted checks; merge ruleset verified separately | AWCP-13, 14 |

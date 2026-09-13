@@ -18,10 +18,10 @@ CONTROLLER_GEN := .tools/bin/controller-gen-$(CONTROLLER_TOOLS_VERSION)/controll
 KUSTOMIZE := .tools/bin/kustomize-$(KUSTOMIZE_VERSION)/kustomize
 LINT := .tools/bin/golangci-lint-$(LINT_VERSION)/golangci-lint
 SETUP_ENVTEST := .tools/bin/setup-envtest-$(ENVTEST_REVISION)/setup-envtest
-IMG ?= awcp-manager:awcp-12
+IMG ?= awcp-manager:awcp-13
 REVISION ?= $(shell git rev-parse HEAD)
 
-.PHONY: bootstrap tools check-go tidy generate manifests fmt build vet lint lint-fix test test-unit test-envtest test-race envtest verify verify-generated render docker-build smoke
+.PHONY: bootstrap tools check-go tidy generate manifests fmt build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated render docker-build smoke
 bootstrap:
 	bash hack/bootstrap-tools.sh
 	$(MAKE) tools
@@ -74,6 +74,10 @@ test-envtest: check-go envtest
 	$(GO) test -count=1 -v ./test/integration/... ./test/contract/... ./test/reconciliation/...
 test-race: check-go envtest
 	$(GO) test -race -count=1 ./...
+coverage: check-go envtest
+	mkdir -p dist
+	$(GO) test -count=1 -covermode=atomic -coverpkg="$$($(GO) list ./... | paste -sd, -)" -coverprofile=dist/coverage.out ./...
+	$(GO) tool cover -func=dist/coverage.out > dist/coverage.txt
 verify: generate manifests build vet lint test verify-generated render
 verify-generated: $(CONTROLLER_GEN)
 	bash hack/verify-generated.sh

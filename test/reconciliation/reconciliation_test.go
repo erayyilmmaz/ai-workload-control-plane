@@ -70,6 +70,17 @@ func eventually(t *testing.T, description string, check func() error) {
 	t.Fatalf("%s: %v", description, err)
 }
 
+func consistently(t *testing.T, description string, check func() error) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if err := check(); err != nil {
+			t.Fatalf("%s: %v", description, err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 func TestReconciliationWithRealAPI(t *testing.T) {
 	if testing.Short() {
 		t.Skip("requires envtest; run make test")
@@ -445,6 +456,77 @@ func TestReconciliationWithRealAPI(t *testing.T) {
 				return errors.New("recovery status wrong")
 			}
 			return nil
+		})
+	})
+	t.Run("deleting parent never recreates an owned child", func(t *testing.T) {
+		deleting := create("deleting")
+		deletingChildren := objects(deleting)
+		ready(deletingChildren)
+		key := client.ObjectKeyFromObject(deleting)
+		for attempt := 0; attempt < 5; attempt++ {
+			var current platform.AIWorkload
+			if err := api.Get(ctx, key, &current); err != nil {
+				t.Fatal(err)
+			}
+			if len(current.Finalizers) != 0 {
+				t.Fatalf("AWCP must not add a finalizer: %v", current.Finalizers)
+			}
+			current.Finalizers = []string{"test.example/hold"}
+			if err := api.Update(ctx, &current); err == nil {
+				break
+			} else if !apierrors.IsConflict(err) {
+				t.Fatal(err)
+			} else if attempt == 4 {
+				t.Fatal("could not add fixture finalizer")
+			}
+		}
+		if err := api.Delete(ctx, deleting); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "parent reaches deletion state", func() error {
+			var current platform.AIWorkload
+			if err := api.Get(ctx, key, &current); err != nil {
+				return err
+			}
+			if current.DeletionTimestamp.IsZero() || len(current.Finalizers) != 1 || current.Finalizers[0] != "test.example/hold" {
+				return errors.New("parent deletion guard is not observable")
+			}
+			return nil
+		})
+		var deployment appsv1.Deployment
+		deploymentKey := client.ObjectKeyFromObject(deletingChildren[1])
+		if err := api.Get(ctx, deploymentKey, &deployment); err != nil {
+			t.Fatal(err)
+		}
+		if err := api.Delete(ctx, &deployment); err != nil {
+			t.Fatal(err)
+		}
+		consistently(t, "deleting parent must not recreate Deployment", func() error {
+			err := api.Get(ctx, deploymentKey, &appsv1.Deployment{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			return errors.New("Deployment was recreated while parent is deleting")
+		})
+		// Envtest does not run the garbage collector. Remove only the test fixture
+		// finalizer so the API object can disappear; kind proves cascade cleanup.
+		var current platform.AIWorkload
+		if err := api.Get(ctx, key, &current); err != nil {
+			t.Fatal(err)
+		}
+		current.Finalizers = nil
+		if err := api.Update(ctx, &current); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "parent finalizes", func() error {
+			err := api.Get(ctx, key, &platform.AIWorkload{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
 		})
 	})
 	t.Run("restart reconstructs from API without database", func(t *testing.T) {

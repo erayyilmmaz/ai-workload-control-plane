@@ -1,4 +1,4 @@
-# Local development — controller observability stage
+# Local development — regression suite stage
 
 This checkout contains a real, buildable workload operator. The manager reconciles one
 guarded Deployment, optional cluster-local Service, dedicated tokenless ServiceAccount
@@ -56,6 +56,7 @@ cached module archives, so **bootstrap itself is not an offline workflow**.
 | `make test-envtest` | Manager integration, API contract and reconciliation/watch suites |
 | `make test` | Full `go test -count=1 ./...`, including envtest |
 | `make test-race` | Full tests with Go race detector |
+| `make coverage` | Project-only atomic coverage profile and function report in ignored `dist/` |
 | `make render` | Validate Kustomize references and write ignored `dist/install.yaml` |
 | `make verify` | Generation, build, vet, lint, tests, generation stability and rendering |
 | `make tidy` | Tidy modules, reapply exact release-family pins, download checksums |
@@ -117,6 +118,9 @@ failure rather than retrying a failed shutdown away.
   restore Secret lifecycle, immutable conflict condition, deleted Deployment recovery,
   current-generation readiness, stale-rollout rejection, scale-to-zero and
   unrelated-parent isolation.
+- AWCP-13 regression suite: parent deletion reaches a real API deletion state and
+  cannot recreate a deleted child; coverage is emitted only for this module's
+  packages, not the Go standard library or dependencies.
 - Kind smoke: image UID 65532, restricted runtime security, real health/readiness,
   manager rollout, leadership, created Deployment/Service contracts, endpoint and
   positive/negative foundation authorization. It intentionally does not wait for
@@ -124,9 +128,10 @@ failure rather than retrying a failed shutdown away.
 
 Envtest uses an administrator test client; it does not prove runtime RBAC.
 Kind smoke checks the foundation Role with the shipped Deployment/Service builder, not
-the old test-only four-kind plan. Neither layer proves application rollout,
-garbage collection, complete Secret dependency recovery, NetworkPolicy enforcement,
-multi-replica leader failover or telemetry. Those belong to later stories.
+the old test-only four-kind plan. It also proves current owned-tree garbage collection
+and user-Secret survival. Neither layer proves application rollout, complete Secret
+dependency recovery, NetworkPolicy enforcement, multi-replica leader failover or
+telemetry. Those belong to later stories.
 
 ## Container and isolated smoke
 
@@ -142,7 +147,7 @@ escalation, uses RuntimeDefault seccomp and a read-only root filesystem; the
 manager needs no writable mount. Its ServiceAccount token remains mounted because
 it must contact Kubernetes. Future workload identities are a separate boundary.
 
-`IMG` defaults to `awcp-manager:awcp-12`; override it consistently for build/smoke.
+`IMG` defaults to `awcp-manager:awcp-13`; override it consistently for build/smoke.
 `REVISION` defaults to the current Git HEAD; before a source commit it identifies
 the parent, not the uncommitted source. Rebuild with the committed revision when
 producing an attributable image. The local image is not a published release.
