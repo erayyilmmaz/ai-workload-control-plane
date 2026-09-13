@@ -24,6 +24,8 @@ Date: 2026-09-13
 | `kustomize build config/default` and `jq empty examples/observability/grafana-awcp-dashboard.json` | Passed | Base render and dashboard JSON syntax |
 | `make verify` | Passed | Full build/lint/unit/envtest/generated/render validation |
 | `make test-race` | Passed | Full race detector validation |
+| `make docker-build IMG=awcp-manager:awcp-11` | Passed | Linux ARM64 manager image built from `23051a9` |
+| `make smoke IMG=awcp-manager:awcp-11` | Passed | Fresh kind bootstrap; HTTPS metrics server, Service and auth-RBAC contract |
 
 ## Limits
 
