@@ -18,10 +18,12 @@ CONTROLLER_GEN := .tools/bin/controller-gen-$(CONTROLLER_TOOLS_VERSION)/controll
 KUSTOMIZE := .tools/bin/kustomize-$(KUSTOMIZE_VERSION)/kustomize
 LINT := .tools/bin/golangci-lint-$(LINT_VERSION)/golangci-lint
 SETUP_ENVTEST := .tools/bin/setup-envtest-$(ENVTEST_REVISION)/setup-envtest
-IMG ?= awcp-manager:awcp-13
+IMG ?= awcp-manager:awcp-14
+DEMO_IMG_V1 ?= awcp-demo:v1
+DEMO_IMG_V2 ?= awcp-demo:v2
 REVISION ?= $(shell git rev-parse HEAD)
 
-.PHONY: bootstrap tools check-go tidy generate manifests fmt build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated render docker-build smoke
+.PHONY: bootstrap tools check-go tidy generate manifests fmt build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated render docker-build demo-test demo-build smoke e2e
 bootstrap:
 	bash hack/bootstrap-tools.sh
 	$(MAKE) tools
@@ -78,7 +80,7 @@ coverage: check-go envtest
 	mkdir -p dist
 	$(GO) test -count=1 -covermode=atomic -coverpkg="$$($(GO) list ./... | paste -sd, -)" -coverprofile=dist/coverage.out ./...
 	$(GO) tool cover -func=dist/coverage.out > dist/coverage.txt
-verify: generate manifests build vet lint test verify-generated render
+verify: generate manifests build vet lint test demo-test verify-generated render
 verify-generated: $(CONTROLLER_GEN)
 	bash hack/verify-generated.sh
 render: $(KUSTOMIZE)
@@ -86,5 +88,12 @@ render: $(KUSTOMIZE)
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 docker-build:
 	docker build --build-arg REVISION="$(REVISION)" -t "$(IMG)" .
+demo-test: check-go
+	cd examples/demo-app && ../../.tools/go/bin/go test -count=1 ./...
+demo-build:
+	docker build --build-arg VERSION=v1 -t "$(DEMO_IMG_V1)" examples/demo-app
+	docker build --build-arg VERSION=v2 -t "$(DEMO_IMG_V2)" examples/demo-app
 smoke: render
 	bash test/e2e/bootstrap-smoke.sh "$(IMG)"
+e2e: render docker-build demo-test demo-build
+	bash test/e2e/lifecycle-e2e.sh "$(IMG)" "$(DEMO_IMG_V1)" "$(DEMO_IMG_V2)"

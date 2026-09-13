@@ -1,0 +1,22 @@
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: lifecycle-demo
+  namespace: awcp-workloads
+spec:
+  image: awcp-demo:v1
+  replicas: 1
+  container:
+    port: 8080
+  health:
+    readiness:
+      path: /ready
+    liveness:
+      path: /health
+  service:
+    enabled: true
+    port: 80
+  secretRefs:
+    - demo-settings
+  network:
+    enabled: true

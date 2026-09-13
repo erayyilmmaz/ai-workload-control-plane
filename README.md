@@ -2,7 +2,7 @@
 
 A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
 
-**Stage: Regression suite (AWCP-13). Unit, envtest and isolated kind checks have explicit ownership boundaries and a reproducible project-only coverage report.**
+**Stage: kind end-to-end environment (AWCP-14). A disposable real-Kubernetes test now proves local application lifecycle, traffic and garbage collection; hosted CI and packaging remain later work.**
 
 An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
 
@@ -36,12 +36,14 @@ make verify
 make test-race
 make docker-build
 make smoke
+make e2e
 ```
 
-Bootstrap installs checksum-verified tools into this checkout. The smoke test uses
-only its own temporary kind cluster and kubeconfig, then removes them. Initial
-tool/image downloads need network access. Full prerequisites and test boundaries
-are in the development guide.
+Bootstrap installs checksum-verified tools into this checkout. Both kind targets
+use only their own temporary cluster and kubeconfig, then remove them. `make e2e`
+also builds local demo v1/v2 images and proves real workload traffic, updates and
+recovery. Initial tool/image downloads need network access. Full prerequisites and
+test boundaries are in the development guide.
 
 ## V0 boundaries
 
@@ -75,8 +77,10 @@ bounded metrics and optional observability artifacts without making telemetry a
 reconciliation dependency. AWCP-12 proves the no-finalizer deletion guard and
 kind-based garbage collection of the owned child tree while preserving user-owned
 Secrets. AWCP-13 adds the consolidated unit/envtest regression suite and a
-project-scoped coverage artefact. Application lifecycle E2E, hosted CI and releases
-remain future work. See
+project-scoped coverage artefact. AWCP-14 adds a disposable kind lifecycle suite:
+real workload traffic, v1-to-v2 rollout, scale, child drift, Secret recovery,
+manager restart and garbage collection. Hosted CI, packaging and releases remain
+future work. See
 [AWCP-2 design evidence](docs/verification/AWCP-2.md) and
 [AWCP-3 execution evidence](docs/verification/AWCP-3.md) and
 [AWCP-4 contract evidence](docs/verification/AWCP-4.md) and
@@ -88,9 +92,10 @@ remain future work. See
 [AWCP-10 status evidence](docs/verification/AWCP-10.md) and
 [AWCP-11 telemetry evidence](docs/verification/AWCP-11.md) and
 [AWCP-12 deletion evidence](docs/verification/AWCP-12.md) and
-[AWCP-13 suite evidence](docs/verification/AWCP-13.md).
+[AWCP-13 suite evidence](docs/verification/AWCP-13.md) and
+[AWCP-14 E2E evidence](docs/verification/AWCP-14.md).
 
-The next milestone is AWCP-14 — kind-based end-to-end test environment.
+The next milestone is AWCP-15 — packaging and developer installation experience.
 Each completed development step is validated, committed and pushed before moving on.
 
 The [original Jira backlog export](docs/backlog/awcp-v0.md) is a dated planning snapshot. Current architecture documents and the version lock supersede its provisional choices; corrections are listed in the compatibility document.

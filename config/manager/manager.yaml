@@ -7,6 +7,14 @@ metadata:
     app.kubernetes.io/name: awcp-controller-manager
 spec:
   replicas: 1
+  # A leader-elected singleton cannot become Ready until the old leader releases
+  # its Lease. Delete the old Pod first to avoid a 1-replica rolling-update
+  # deadlock where maxUnavailable's default rounds down to zero.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: awcp-controller-manager
@@ -26,7 +34,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: awcp-manager:awcp-13
+          image: awcp-manager:awcp-14
           imagePullPolicy: IfNotPresent
           args:
             - --leader-elect=true

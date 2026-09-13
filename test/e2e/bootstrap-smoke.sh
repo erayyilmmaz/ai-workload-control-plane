@@ -2,7 +2,7 @@
 # Manager/container plus identity/Deployment/Service/NetworkPolicy/status-contract smoke; traffic enforcement E2E requires a CNI profile.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-image="${1:-awcp-manager:awcp-13}"
+image="${1:-awcp-manager:awcp-14}"
 for tool in kind kubectl; do
   test -x ".tools/bin/$tool" || bash hack/bootstrap-tools.sh "$tool"
 done

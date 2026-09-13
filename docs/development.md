@@ -147,10 +147,14 @@ escalation, uses RuntimeDefault seccomp and a read-only root filesystem; the
 manager needs no writable mount. Its ServiceAccount token remains mounted because
 it must contact Kubernetes. Future workload identities are a separate boundary.
 
-`IMG` defaults to `awcp-manager:awcp-13`; override it consistently for build/smoke.
+`IMG` defaults to `awcp-manager:awcp-14`; override it consistently for build/smoke/E2E.
 `REVISION` defaults to the current Git HEAD; before a source commit it identifies
 the parent, not the uncommitted source. Rebuild with the committed revision when
 producing an attributable image. The local image is not a published release.
+
+The singleton, leader-elected manager uses `maxSurge: 0` and `maxUnavailable: 1`.
+This releases the old leader before the replacement must satisfy readiness; the
+default one-replica Deployment strategy can otherwise deadlock during a restart.
 
 The smoke script installs pinned kind/kubectl if absent, creates a random uniquely
 named `awcp-bootstrap-*` cluster with the locked node digest and a temporary
@@ -158,6 +162,20 @@ kubeconfig, loads the local image and applies the bootstrap manifests. It refuse
 an existing name. It prints diagnostics on failure and removes only its own
 cluster/kubeconfig on exit, including interrupted runs. Images and tool/build
 caches remain reusable. It never runs against the current user cluster.
+
+## End-to-end lifecycle
+
+```bash
+make e2e
+```
+
+This target renders the bundle, builds the manager plus local `awcp-demo:v1` and
+`awcp-demo:v2` images, then loads them into a temporary isolated kind cluster. It
+validates create/traffic, image rollout, scale, child drift, Secret failure and
+restore, manager restart, authenticated metrics and owner-reference garbage
+collection. It removes only that random `awcp-e2e-*` cluster and its temporary
+kubeconfig. See the full [E2E contract](e2e.md); NetworkPolicy CNI enforcement is
+outside this standard profile.
 
 Do **not** use `kubectl delete -f dist/install.yaml` as ordinary undeploy: the
 bootstrap bundle includes Namespaces and a CRD, and deleting those destroys CRs
