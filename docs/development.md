@@ -1,11 +1,11 @@
-# Local development — Workload identity and Secret prerequisite stage
+# Local development — NetworkPolicy generation stage
 
 This checkout contains a real, buildable Kubebuilder scaffold. It is **not yet a
 workload operator**: the manager reconciles one guarded Deployment, optional
-cluster-local Service and dedicated tokenless ServiceAccount, but does not yet
-create NetworkPolicy or publish workload readiness. It validates referenced Secret
-metadata and reports a missing prerequisite without reading Secret payloads. Samples
-still use placeholder images, so never use them as an application deployment.
+cluster-local Service, dedicated tokenless ServiceAccount and ingress-only
+NetworkPolicy, but does not publish workload readiness. It validates referenced
+Secret metadata and reports a missing prerequisite without reading Secret payloads.
+Samples still use placeholder images, so never use them as an application deployment.
 
 ## Prerequisites and first setup
 
@@ -140,7 +140,7 @@ escalation, uses RuntimeDefault seccomp and a read-only root filesystem; the
 manager needs no writable mount. Its ServiceAccount token remains mounted because
 it must contact Kubernetes. Future workload identities are a separate boundary.
 
-`IMG` defaults to `awcp-manager:awcp-8`; override it consistently for build/smoke.
+`IMG` defaults to `awcp-manager:awcp-9`; override it consistently for build/smoke.
 `REVISION` defaults to the current Git HEAD; before a source commit it identifies
 the parent, not the uncommitted source. Rebuild with the committed revision when
 producing an attributable image. The local image is not a published release.

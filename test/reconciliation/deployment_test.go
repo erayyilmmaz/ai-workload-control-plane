@@ -7,12 +7,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -333,6 +335,54 @@ func TestProductionDeployment(t *testing.T) {
 			}
 			if len(service.Spec.Ports) != 1 || service.Spec.Ports[0].Port != 8082 || workload.Status.Endpoint != resource.ChildName(alpha.Name)+".workloads.svc:8082" {
 				return errors.New("re-enabled Service has not converged")
+			}
+			return nil
+		})
+	})
+	t.Run("NetworkPolicy drift toggle and unrelated policy lifecycle", func(t *testing.T) {
+		var policy networkingv1.NetworkPolicy
+		eventually(t, "initial NetworkPolicy", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &policy); err != nil {
+				return err
+			}
+			if !apiequality.Semantic.DeepEqual(policy.Spec.PodSelector.MatchLabels, resource.SelectorLabels(alpha)) || !reflect.DeepEqual(policy.Spec.PolicyTypes, []networkingv1.PolicyType{networkingv1.PolicyTypeIngress}) || len(policy.Spec.Ingress) != 1 || len(policy.Spec.Ingress[0].From) != 1 || policy.Spec.Ingress[0].From[0].PodSelector == nil || policy.Spec.Ingress[0].From[0].NamespaceSelector != nil || len(policy.Spec.Ingress[0].Ports) != 1 || policy.Spec.Ingress[0].Ports[0].Port == nil || *policy.Spec.Ingress[0].Ports[0].Port != intstr.FromString(resource.HTTPPortName) || len(policy.Spec.Egress) != 0 {
+				return errors.New("NetworkPolicy contract has not converged")
+			}
+			return nil
+		})
+		policy.Spec.PolicyTypes = []networkingv1.PolicyType{networkingv1.PolicyTypeEgress}
+		policy.Spec.Ingress = nil
+		policy.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{{}}
+		if err := api.Update(ctx, &policy); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "NetworkPolicy drift repair", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &policy); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(policy.Spec.PolicyTypes, []networkingv1.PolicyType{networkingv1.PolicyTypeIngress}) || len(policy.Spec.Ingress) != 1 || len(policy.Spec.Egress) != 0 {
+				return errors.New("NetworkPolicy drift has not converged")
+			}
+			return nil
+		})
+		unrelated := &networkingv1.NetworkPolicy{ObjectMeta: metav1.ObjectMeta{Name: "user-policy", Namespace: alpha.Namespace}, Spec: networkingv1.NetworkPolicySpec{PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"user.example/policy": "true"}}}}
+		if err := api.Create(ctx, unrelated); err != nil {
+			t.Fatal(err)
+		}
+		current = update(t, alpha, func(p *platform.AIWorkload) { p.Spec.Network = &platform.NetworkSpec{Enabled: ptr.To(false)} })
+		eventually(t, "disabled NetworkPolicy removal", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &networkingv1.NetworkPolicy{}); !apierrors.IsNotFound(err) {
+				return errors.New("disabled NetworkPolicy still exists")
+			}
+			return api.Get(ctx, client.ObjectKeyFromObject(unrelated), &networkingv1.NetworkPolicy{})
+		})
+		current = update(t, alpha, func(p *platform.AIWorkload) { p.Spec.Network = &platform.NetworkSpec{Enabled: ptr.To(true)} })
+		eventually(t, "re-enabled NetworkPolicy", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &policy); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(policy.Spec.PolicyTypes, []networkingv1.PolicyType{networkingv1.PolicyTypeIngress}) || len(policy.Spec.Ingress) != 1 || len(policy.Spec.Egress) != 0 {
+				return errors.New("re-enabled NetworkPolicy has not converged")
 			}
 			return nil
 		})

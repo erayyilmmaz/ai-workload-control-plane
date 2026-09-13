@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Manager/container plus identity/Deployment/Service-contract smoke; full ready-pod traffic E2E belongs to AWCP-14.
+# Manager/container plus identity/Deployment/Service/NetworkPolicy-contract smoke; traffic enforcement E2E requires a CNI profile.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-image="${1:-awcp-manager:awcp-8}"
+image="${1:-awcp-manager:awcp-9}"
 for tool in kind kubectl; do
   test -x ".tools/bin/$tool" || bash hack/bootstrap-tools.sh "$tool"
 done
@@ -89,6 +89,12 @@ workload_uid="$("$kubectl" -n awcp-workloads get "aiworkload/$workload" -o jsonp
   .spec.clusterIP != "" and .spec.clusterIP != "None" and
   .spec.selector == {"app.kubernetes.io/instance":$child, "platform.example.io/workload-uid":$uid} and
   .spec.ports == [{name:"http", protocol:"TCP", port:80, targetPort:"http"}]'
+"$kubectl" -n awcp-workloads get "networkpolicy/$child" -o json | jq -e --arg child "$child" --arg uid "$workload_uid" '
+  .metadata.ownerReferences == [{apiVersion:"platform.example.io/v1alpha1", kind:"AIWorkload", name:"bootstrap-sample", uid:$uid, controller:true, blockOwnerDeletion:false}] and
+  .spec.podSelector.matchLabels == {"app.kubernetes.io/instance":$child, "platform.example.io/workload-uid":$uid} and
+  .spec.policyTypes == ["Ingress"] and
+  .spec.ingress == [{from:[{podSelector:{}}], ports:[{protocol:"TCP", port:"http"}]}] and
+  .spec.egress == null'
 endpoint="$child.awcp-workloads.svc:80"
 i=0
 while test "$i" -lt 30; do
@@ -126,4 +132,4 @@ done
 answer="$("$kubectl" auth can-i get aiworkloads.platform.example.io -n default --as="$identity" || true)"
 test "$answer" = no
 "$kubectl" -n awcp-system logs deployment/awcp-controller-manager --tail=30
-echo 'PASS: manager security, health/readiness, Lease, identity/Deployment/Service contracts, endpoint and least-privilege RBAC'
+echo 'PASS: manager security, health/readiness, Lease, identity/Deployment/Service/NetworkPolicy contracts, endpoint and least-privilege RBAC'

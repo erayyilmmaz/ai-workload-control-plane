@@ -2,9 +2,10 @@
 
 Status: accepted design, AWCP-2, 2026-09-12. AWCP-5 implements the shared engine,
 ownership guard, watch/index wiring and bounded failure reporting; AWCP-6 implements
-the Deployment mapping, AWCP-7 the optional Service, and AWCP-8 dedicated identity
-plus Secret prerequisites. NetworkPolicy and complete observed status remain later
-milestones. This document remains the target contract, not a claim of full implementation.
+the Deployment mapping, AWCP-7 the optional Service, AWCP-8 dedicated identity plus
+Secret prerequisites, and AWCP-9 the ingress-only NetworkPolicy. Complete observed
+status remains a later milestone. This document remains the target contract, not a
+claim of full implementation.
 
 ## Control plane boundary
 

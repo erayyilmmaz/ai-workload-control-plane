@@ -28,8 +28,7 @@ const (
 	WorkloadNameAnnotation = "platform.example.io/workload-name"
 )
 
-// WorkloadBuilder is the production composition root. Identity/network intents
-// are added in AWCP-8/9; AWCP-6/7 emit Deployment and optional Service.
+// WorkloadBuilder is the production composition root for V0 direct children.
 type WorkloadBuilder struct{}
 
 func (WorkloadBuilder) Build(p *platform.AIWorkload) ([]Intent, error) {
@@ -54,7 +53,7 @@ func (WorkloadBuilder) Build(p *platform.AIWorkload) ([]Intent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []Intent{identity, deployment, service}, nil
+	return []Intent{identity, deployment, service, networkPolicyIntent(desired)}, nil
 }
 
 // SelectorLabels returns fresh stable identity labels, independent of generation/image.

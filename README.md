@@ -2,7 +2,7 @@
 
 A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
 
-**Stage: Workload identity and Secret prerequisites (AWCP-8). The manager creates a guarded Deployment, optional cluster-local Service and dedicated unprivileged ServiceAccount; workload readiness follows in later milestones.**
+**Stage: Network isolation policy generation (AWCP-9). The manager creates guarded Deployment, Service, ServiceAccount and same-namespace ingress NetworkPolicy resources; workload readiness follows in later milestones.**
 
 An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
 
@@ -65,8 +65,9 @@ deletion and allocated-address preservation. Dedicated ServiceAccount creation,
 NetworkPolicy, complete dependency checks and workload readiness remain subsequent
 work. AWCP-8 creates the dedicated tokenless identity and validates referenced
 Secret metadata without reading payloads; missing Secrets receive a safe condition
-and Secret restore requeues without CR edits. NetworkPolicy and workload readiness
-remain subsequent work.
+and Secret restore requeues without CR edits. AWCP-9 adds a standard, ingress-only
+NetworkPolicy for same-namespace pods to the named `http` port. It does not impose
+egress isolation or prove CNI enforcement. Workload readiness remains subsequent work.
 Metrics, application lifecycle E2E, hosted CI and releases
 remain future work. See [AWCP-2 design evidence](docs/verification/AWCP-2.md) and
 [AWCP-3 execution evidence](docs/verification/AWCP-3.md) and
@@ -74,9 +75,10 @@ remain future work. See [AWCP-2 design evidence](docs/verification/AWCP-2.md) an
 [AWCP-5 foundation evidence](docs/verification/AWCP-5.md).
 [AWCP-6 deployment evidence](docs/verification/AWCP-6.md) and
 [AWCP-7 Service evidence](docs/verification/AWCP-7.md) and
-[AWCP-8 identity evidence](docs/verification/AWCP-8.md).
+[AWCP-8 identity evidence](docs/verification/AWCP-8.md) and
+[AWCP-9 NetworkPolicy evidence](docs/verification/AWCP-9.md).
 
-The next milestone is AWCP-9 — network isolation and NetworkPolicy reconciliation.
+The next milestone is AWCP-10 — status conditions, failure model and Kubernetes Events.
 Each completed development step is validated, committed and pushed before moving on.
 
 The [original Jira backlog export](docs/backlog/awcp-v0.md) is a dated planning snapshot. Current architecture documents and the version lock supersede its provisional choices; corrections are listed in the compatibility document.

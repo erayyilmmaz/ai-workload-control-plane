@@ -12,7 +12,8 @@ falls back to `default`. Both the ServiceAccount and Pod disable token automount
 the identity receives no generated RoleBinding. Referenced Secret metadata is checked
 after child convergence and missing prerequisites receive a safe condition. AWCP-7
 adds the optional cluster-local Service described in [service.md](service.md);
-NetworkPolicy arrives in AWCP-9. This is not full application readiness or a
+AWCP-9 adds the ingress-only NetworkPolicy described in
+[network-policy.md](network-policy.md). This is not full application readiness or a
 production release.
 
 ## Field ownership

@@ -16,10 +16,10 @@ Missing/deleting parent stops work. Writes are sequential, not atomic; a retry
 resumes from API state. No finalizer, database, force update or adoption is added.
 
 `manager.Options.Builder` is the internal composition point. If unset, the manager
-uses `WorkloadBuilder`, which emits AWCP-8 ServiceAccount, AWCP-6 Deployment and
-AWCP-7 optional Service intents. `test/fixtures.Plan` remains deliberately incomplete
-and only supports AWCP-5 engine tests. AWCP-9 adds the remaining production child;
-AWCP-10 observes readiness. An optional controller name
+uses `WorkloadBuilder`, which emits AWCP-8 ServiceAccount, AWCP-6 Deployment,
+AWCP-7 optional Service and AWCP-9 optional NetworkPolicy intents.
+`test/fixtures.Plan` remains deliberately incomplete and only supports AWCP-5 engine
+tests. AWCP-10 observes readiness. An optional controller name
 allows tests to restart managers sequentially without disabling the runtime's
 process-global name uniqueness validation; the shipped name stays `aiworkload`.
 
