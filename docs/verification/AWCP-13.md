@@ -20,6 +20,8 @@ Date: 2026-09-13
 | `make coverage` | Passed | Project-only atomic profile and function report |
 | `make verify` | Passed | Full build/lint/unit/envtest/generated/render validation |
 | `make test-race` | Passed | Race detector validation |
+| `make docker-build IMG=awcp-manager:awcp-13` | Passed | Linux ARM64 manager image built from `9c71207` |
+| `make smoke IMG=awcp-manager:awcp-13` | Passed | Isolated kind regression of manager, RBAC, metrics and owned-tree deletion contracts |
 
 The executed project-only coverage report totals **83.5%** statements. This is a
 recorded baseline rather than a release threshold; behavioral acceptance remains the
