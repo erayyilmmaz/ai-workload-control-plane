@@ -2,7 +2,7 @@
 # Real-Kubernetes acceptance test. It creates and deletes only its own kind cluster.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-manager_image="${1:-awcp-manager:awcp-14}"
+manager_image="${1:-awcp-manager:awcp-15}"
 demo_v1="${2:-awcp-demo:v1}"
 demo_v2="${3:-awcp-demo:v2}"
 
@@ -110,9 +110,7 @@ for image in "$manager_image" "$demo_v1" "$demo_v2"; do test "$(docker image ins
 created=true
 "$kind" create cluster --name "$cluster" --kubeconfig "$KUBECONFIG" --config test/e2e/kind-config.yaml --image "$(jq -r '.kubernetes.kindNodeImage' toolchain.lock.json)" --wait 120s
 "$kind" load docker-image "$manager_image" "$demo_v1" "$demo_v2" --name "$cluster"
-"$kubectl" apply -f dist/install.yaml
-"$kubectl" -n awcp-system set image deployment/awcp-controller-manager "manager=$manager_image"
-"$kubectl" -n awcp-system rollout status deployment/awcp-controller-manager --timeout=180s
+make deploy DEPLOY_IMG="$manager_image"
 "$kubectl" apply -f examples/observability/metrics-reader-clusterrole.yaml
 "$kubectl" apply -f test/e2e/metrics-reader.yaml
 "$kubectl" -n awcp-workloads create secret generic demo-settings --from-literal=marker=synthetic
@@ -154,7 +152,16 @@ wait_secret_failure
 wait_workload_ready 2
 assert_metrics
 
-# GC removes owned objects only.
+# Normal package removal preserves the CRD, workload tree, namespace and user Secret.
+make undeploy
+"$kubectl" get crd/aiworkloads.platform.example.io >/dev/null
+"$kubectl" -n awcp-workloads get "aiworkload/$workload" "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child" secret/demo-settings >/dev/null
+if "$kubectl" -n awcp-system get deployment/awcp-controller-manager >/dev/null 2>&1; then
+  echo 'make undeploy left the manager Deployment behind' >&2
+  exit 1
+fi
+
+# GC still removes owned objects after an explicit parent deletion.
 "$kubectl" -n awcp-workloads delete aiworkload/lifecycle-demo --wait=false
 for owned in "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child"; do "$kubectl" -n awcp-workloads wait --for=delete "$owned" --timeout=90s; done
 "$kubectl" -n awcp-workloads wait --for=delete aiworkload/lifecycle-demo --timeout=90s
@@ -163,4 +170,4 @@ for kind_name in replicasets pods; do
   test -z "${remaining:-}" || { echo "$kind_name remained after parent deletion" >&2; exit 1; }
 done
 "$kubectl" -n awcp-workloads get secret/demo-settings -o json | jq -e '.metadata.ownerReferences == null and .data.marker != null' >/dev/null
-echo 'PASS: create, traffic, v1-to-v2 rollout, scale, drift, Secret recovery, restart, authenticated metrics and garbage collection'
+echo 'PASS: package deploy/undeploy, traffic, v1-to-v2 rollout, scale, drift, Secret recovery, restart, metrics and garbage collection'

@@ -18,12 +18,14 @@ CONTROLLER_GEN := .tools/bin/controller-gen-$(CONTROLLER_TOOLS_VERSION)/controll
 KUSTOMIZE := .tools/bin/kustomize-$(KUSTOMIZE_VERSION)/kustomize
 LINT := .tools/bin/golangci-lint-$(LINT_VERSION)/golangci-lint
 SETUP_ENVTEST := .tools/bin/setup-envtest-$(ENVTEST_REVISION)/setup-envtest
-IMG ?= awcp-manager:awcp-14
+IMG ?= awcp-manager:awcp-15
+VERSION ?= 0.1.0-dev
+DEPLOY_IMG ?=
 DEMO_IMG_V1 ?= awcp-demo:v1
 DEMO_IMG_V2 ?= awcp-demo:v2
 REVISION ?= $(shell git rev-parse HEAD)
 
-.PHONY: bootstrap tools check-go tidy generate manifests fmt build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated render docker-build demo-test demo-build smoke e2e
+.PHONY: bootstrap tools check-go tidy generate manifests fmt build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated render docker-build demo-test demo-build smoke e2e kubectl install deploy undeploy release-bundle verify-package
 bootstrap:
 	bash hack/bootstrap-tools.sh
 	$(MAKE) tools
@@ -87,7 +89,7 @@ render: $(KUSTOMIZE)
 	mkdir -p dist
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 docker-build:
-	docker build --build-arg REVISION="$(REVISION)" -t "$(IMG)" .
+	docker build --build-arg VERSION="$(VERSION)" --build-arg REVISION="$(REVISION)" -t "$(IMG)" .
 demo-test: check-go
 	cd examples/demo-app && ../../.tools/go/bin/go test -count=1 ./...
 demo-build:
@@ -97,3 +99,20 @@ smoke: render
 	bash test/e2e/bootstrap-smoke.sh "$(IMG)"
 e2e: render docker-build demo-test demo-build
 	bash test/e2e/lifecycle-e2e.sh "$(IMG)" "$(DEMO_IMG_V1)" "$(DEMO_IMG_V2)"
+kubectl:
+	@test -x .tools/bin/kubectl || bash hack/bootstrap-tools.sh kubectl
+install: kubectl
+	.tools/bin/kubectl apply -k config/install
+deploy: kubectl
+	@test -n "$(DEPLOY_IMG)" || { echo 'Set DEPLOY_IMG to an accessible immutable image reference, preferably repo@sha256:...'; exit 1; }
+	root_dir="$(CURDIR)"; task_dir="$$(mktemp -d "$${TMPDIR:-/tmp}/awcp-deploy.XXXXXX")"; trap 'rm -rf "$$task_dir"' EXIT; cp -R config "$$task_dir/config"; cd "$$task_dir/config/default"; "$$root_dir/$(KUSTOMIZE)" edit set image "awcp-manager=$(DEPLOY_IMG)"; "$$root_dir/.tools/bin/kubectl" apply -k .; "$$root_dir/.tools/bin/kubectl" wait --for=condition=Established crd/aiworkloads.platform.example.io --timeout=60s; "$$root_dir/.tools/bin/kubectl" -n awcp-system rollout status deployment/awcp-controller-manager --timeout=180s
+undeploy: kubectl
+	.tools/bin/kubectl delete -k config/uninstall --ignore-not-found
+release-bundle: render
+	mkdir -p dist/release
+	$(KUSTOMIZE) build config/install > dist/release/awcp-crds.yaml
+	$(KUSTOMIZE) build config/default > dist/release/awcp-operator.yaml
+	$(KUSTOMIZE) build config/uninstall > dist/release/awcp-operator-uninstall.yaml
+	shasum -a 256 dist/release/awcp-crds.yaml dist/release/awcp-operator.yaml dist/release/awcp-operator-uninstall.yaml > dist/release/SHA256SUMS
+verify-package:
+	bash test/packaging/verify-bundle.sh

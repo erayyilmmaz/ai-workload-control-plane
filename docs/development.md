@@ -1,4 +1,4 @@
-# Local development — regression suite stage
+# Local development — packaging stage
 
 This checkout contains a real, buildable workload operator. The manager reconciles one
 guarded Deployment, optional cluster-local Service, dedicated tokenless ServiceAccount
@@ -62,6 +62,10 @@ cached module archives, so **bootstrap itself is not an offline workflow**.
 | `make tidy` | Tidy modules, reapply exact release-family pins, download checksums |
 | `make docker-build` | Local image only; never pushes an image |
 | `make smoke` | Isolated kind manager/container smoke and automatic cleanup |
+| `make install` | Apply the CRD-only Kustomize package to the selected context |
+| `make deploy DEPLOY_IMG=repo@sha256:...` | Apply the full package with an explicit accessible immutable manager image |
+| `make undeploy` | Remove only manager/RBAC/metrics; preserve CRDs, namespaces and workloads |
+| `make release-bundle` / `make verify-package` | Build and structurally verify portable YAML/checksum artifacts without a cluster |
 
 Use `make tidy` rather than plain `go mod tidy`: lazy loading can otherwise
 remove explicit patch pins for Kubernetes modules not yet compiled by this
@@ -147,7 +151,7 @@ escalation, uses RuntimeDefault seccomp and a read-only root filesystem; the
 manager needs no writable mount. Its ServiceAccount token remains mounted because
 it must contact Kubernetes. Future workload identities are a separate boundary.
 
-`IMG` defaults to `awcp-manager:awcp-14`; override it consistently for build/smoke/E2E.
+`IMG` defaults to `awcp-manager:awcp-15`; override it consistently for build/smoke/E2E.
 `REVISION` defaults to the current Git HEAD; before a source commit it identifies
 the parent, not the uncommitted source. Rebuild with the committed revision when
 producing an attributable image. The local image is not a published release.
@@ -177,10 +181,9 @@ collection. It removes only that random `awcp-e2e-*` cluster and its temporary
 kubeconfig. See the full [E2E contract](e2e.md); NetworkPolicy CNI enforcement is
 outside this standard profile.
 
-Do **not** use `kubectl delete -f dist/install.yaml` as ordinary undeploy: the
-bootstrap bundle includes Namespaces and a CRD, and deleting those destroys CRs
-and other contents. There is intentionally no generic uninstall target here.
-Safe packaging/install/uninstall workflows are AWCP-15's deliverable.
+See the [installation guide](installation.md) for canonical Kustomize deployment,
+upgrade/tagging, release bundle and safe-removal workflows. Do **not** delete the
+full bootstrap bundle as ordinary undeploy: it includes Namespaces and a CRD.
 
 ## Generated versus owned source
 

@@ -2,7 +2,7 @@
 
 A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
 
-**Stage: kind end-to-end environment (AWCP-14). A disposable real-Kubernetes test now proves local application lifecycle, traffic and garbage collection; hosted CI and packaging remain later work.**
+**Stage: packaging and developer installation (AWCP-15). Kustomize is the canonical package; it has explicit CRD, deploy, safe undeploy and release-bundle boundaries.**
 
 An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
 
@@ -37,6 +37,8 @@ make test-race
 make docker-build
 make smoke
 make e2e
+make release-bundle
+make verify-package
 ```
 
 Bootstrap installs checksum-verified tools into this checkout. Both kind targets
@@ -44,6 +46,8 @@ use only their own temporary cluster and kubeconfig, then remove them. `make e2e
 also builds local demo v1/v2 images and proves real workload traffic, updates and
 recovery. Initial tool/image downloads need network access. Full prerequisites and
 test boundaries are in the development guide.
+
+For an accessible immutable controller image, use the [installation guide](docs/installation.md). This repository does not yet publish a production image; local image tags are not a release quick start.
 
 ## V0 boundaries
 
@@ -79,8 +83,8 @@ kind-based garbage collection of the owned child tree while preserving user-owne
 Secrets. AWCP-13 adds the consolidated unit/envtest regression suite and a
 project-scoped coverage artefact. AWCP-14 adds a disposable kind lifecycle suite:
 real workload traffic, v1-to-v2 rollout, scale, child drift, Secret recovery,
-manager restart and garbage collection. Hosted CI, packaging and releases remain
-future work. See
+manager restart and garbage collection. AWCP-15 adds canonical Kustomize packaging
+and safe removal. Hosted CI and published images/releases remain future work. See
 [AWCP-2 design evidence](docs/verification/AWCP-2.md) and
 [AWCP-3 execution evidence](docs/verification/AWCP-3.md) and
 [AWCP-4 contract evidence](docs/verification/AWCP-4.md) and
@@ -93,9 +97,10 @@ future work. See
 [AWCP-11 telemetry evidence](docs/verification/AWCP-11.md) and
 [AWCP-12 deletion evidence](docs/verification/AWCP-12.md) and
 [AWCP-13 suite evidence](docs/verification/AWCP-13.md) and
-[AWCP-14 E2E evidence](docs/verification/AWCP-14.md).
+[AWCP-14 E2E evidence](docs/verification/AWCP-14.md) and
+[AWCP-15 packaging evidence](docs/verification/AWCP-15.md).
 
-The next milestone is AWCP-15 — packaging and developer installation experience.
+The next milestone is AWCP-16 — CI quality gates and supply-chain hygiene.
 Each completed development step is validated, committed and pushed before moving on.
 
 The [original Jira backlog export](docs/backlog/awcp-v0.md) is a dated planning snapshot. Current architecture documents and the version lock supersede its provisional choices; corrections are listed in the compatibility document.
