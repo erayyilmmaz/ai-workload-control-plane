@@ -151,10 +151,10 @@ for owned in "deployment/$child" "service/$child" "serviceaccount/$child" "netwo
   "$kubectl" -n awcp-workloads wait --for=delete "$owned" --timeout=60s
 done
 "$kubectl" -n awcp-workloads wait --for=delete "aiworkload/$workload" --timeout=60s
-for kind in replicasets pods; do
+for resource_kind in replicasets pods; do
   i=0
   while test "$i" -lt 60; do
-    remaining="$("$kubectl" -n awcp-workloads get "$kind" -l "app.kubernetes.io/instance=$child" -o name 2>/dev/null || true)"
+    remaining="$("$kubectl" -n awcp-workloads get "$resource_kind" -l "app.kubernetes.io/instance=$child" -o name 2>/dev/null || true)"
     test -z "$remaining" && break
     i=$((i + 1))
     sleep 1
