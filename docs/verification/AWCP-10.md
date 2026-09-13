@@ -26,6 +26,8 @@ Date: 2026-09-13
 | `KUBEBUILDER_ASSETS=... go test -count=1 -v ./test/reconciliation` | Passed | Real API current/stale rollout, Secret recovery, scale-to-zero, status no-op and existing ownership lifecycle |
 | `make verify` | Passed | Full build/lint/unit/envtest/generated/render validation |
 | `make test-race` | Passed | Full race detector validation |
+| `DOCKER_CONFIG=... DOCKER_HOST=... make docker-build IMG=awcp-manager:awcp-10` | Passed | Local Linux ARM64 manager image for commit `f870677` |
+| `DOCKER_CONFIG=... DOCKER_HOST=... make smoke IMG=awcp-manager:awcp-10` | Passed | Fresh kind bootstrap: manager, child resource, non-ready current status triple and least-privilege RBAC contracts |
 
 The real-API status fixture sets Deployment status directly; envtest has no scheduler,
 kubelet, image puller, DNS or Service traffic. It proves the controller's interpretation
