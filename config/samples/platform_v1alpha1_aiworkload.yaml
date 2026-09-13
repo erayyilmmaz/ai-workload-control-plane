@@ -1,5 +1,5 @@
-# Valid AWCP-6 Deployment fixture only. It uses a placeholder image and its
-# dedicated ServiceAccount is created in AWCP-8, so it is not a runnable demo.
+# Valid AWCP-8 identity/Service fixture. It uses a placeholder image, so it is not
+# a runnable demo even though its dedicated ServiceAccount is now created.
 apiVersion: platform.example.io/v1alpha1
 kind: AIWorkload
 metadata:

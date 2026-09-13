@@ -39,7 +39,6 @@ func secretIndex(o client.Object) []string {
 }
 
 // RequestsForSecret is payload-free and namespace-scoped, including delete events.
-// Actual Secret prerequisite/status decisions belong to AWCP-8.
 func (r *AIWorkloadReconciler) RequestsForSecret(ctx context.Context, o client.Object) []ctrl.Request {
 	if o.GetNamespace() != r.WatchNamespace {
 		return nil

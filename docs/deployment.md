@@ -7,13 +7,13 @@ Deployment intent per AIWorkload. The AWCP-5 engine provides ownership checks,
 create/patch/no-op, drift repair and deletion recovery. There is no separate
 Deployment reconciler with a different safety policy.
 
-The dedicated ServiceAccount **name is bound but its object is not created yet**
-(AWCP-8). Native ReplicaSet/Pod creation can therefore report `FailedCreate` until
-that identity exists. Secret names are mapped but metadata prerequisites/status
-arrive in AWCP-8. AWCP-7 adds the optional cluster-local Service described in
-[service.md](service.md); NetworkPolicy arrives in AWCP-9. Do not work around this
-staged implementation by switching to the default ServiceAccount or granting
-workload RBAC. This is not full application readiness or a production release.
+AWCP-8 creates the dedicated ServiceAccount before the Deployment, so the pod never
+falls back to `default`. Both the ServiceAccount and Pod disable token automount;
+the identity receives no generated RoleBinding. Referenced Secret metadata is checked
+after child convergence and missing prerequisites receive a safe condition. AWCP-7
+adds the optional cluster-local Service described in [service.md](service.md);
+NetworkPolicy arrives in AWCP-9. This is not full application readiness or a
+production release.
 
 ## Field ownership
 
@@ -23,7 +23,7 @@ workload RBAC. This is not full application readiness or a production release.
 | Deployment and Pod-template metadata | Five common/selector labels from architecture; `platform.example.io/workload-name` annotation | Other labels/annotations, including deployment revision and injected metadata |
 | Selector | Exact two-label CR UID/child-name identity, no expressions | Mismatch on an existing object is a conflict; selector is never changed |
 | Deployment rollout | replicas (nil→1, explicit 0 retained), RollingUpdate, maxUnavailable=0, maxSurge=1, minReadySeconds=0, progressDeadlineSeconds=120, paused=false | Server-defaulted or explicitly configured revisionHistoryLimit |
-| Pod identity | serviceAccountName and legacy alias = child name, token automount=false | No ServiceAccount/RBAC creation in this step |
+| Pod identity | serviceAccountName and legacy alias = child name, token automount=false | Dedicated ServiceAccount has no generated RoleBinding/RBAC |
 | Pod security | runAsNonRoot=true, seccomp RuntimeDefault | Other context fields, e.g. fsGroup and a chosen non-root UID |
 | Container `workload` | Image, explicit IfNotPresent, named TCP port `http`, CPU/memory resources, readiness/liveness, entire ordered envFrom list | Named-container lookup preserves position, other containers, command/args/env, mounts, unrelated ports and API defaults |
 | `http` port entry | Name, container port, TCP; no hostPort/hostIP | Other named port entries |
@@ -98,7 +98,7 @@ paste Secret data, env dumps or unredacted application logs into an issue.
 
 | Symptom | Where an authorized operator checks | Interpretation / next action |
 | --- | --- | --- |
-| FailedCreate; ServiceAccount not found | Deployment/ReplicaSet events | Expected staged prerequisite until AWCP-8; do not substitute default identity |
+| SecretNotFound condition | AIWorkload conditions and authorized Secret metadata inspection | Create/restore the same Secret in the workload namespace; never paste payload data into diagnostics |
 | ErrImagePull / ImagePullBackOff | Pod container waiting reason and redacted image-pull events | Invalid/unavailable image or registry access; fix spec.image, no automatic image fallback |
 | CrashLoopBackOff | Restart count, last termination reason/exit code; controlled log review if authorized | Application startup/crash; non-root/image compatibility and application config may be involved |
 | Readiness failing | Pod Ready/container readiness and probe events | Pod may run but should not receive ready Service traffic; check port/path and app readiness |

@@ -31,7 +31,8 @@ AWCP-3's repository foundation is now implemented; see its
 [AWCP-5](verification/AWCP-5.md) implements the reconciliation/ownership engine and
 watch wiring. [AWCP-6](verification/AWCP-6.md) activates the production Deployment
 mapping; [AWCP-7](verification/AWCP-7.md) activates optional ClusterIP Service
-mapping and the discovery endpoint. NetworkPolicy, dedicated ServiceAccount creation, dependency
+mapping and the discovery endpoint; [AWCP-8](verification/AWCP-8.md) activates
+dedicated identity and Secret missing/restore decisions. NetworkPolicy, dependency
 checks and full observed readiness remain later milestones.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
@@ -42,7 +43,7 @@ checks and full observed readiness remain later milestones.
 | 04 / AWC-4 | AWCP-5 | Ownership, watch wiring, idempotent reconcile | Unit + envtest events/no-op/collision | AWCP-4 |
 | 05 / AWC-5 | AWCP-6 | Deployment field mapping and rollout intent | Builder unit + envtest; real rollout later | AWCP-5 |
 | 06 / AWC-6 | AWCP-7 | Service toggles, allocated field preservation, endpoint | Unit + envtest; real DNS/HTTP later | AWCP-6 |
-| 07 / AWC-7 | AWCP-8 | Identity, Secret metadata index/watch, RBAC | Unit/envtest missing/restore, later auth/runtime checks | AWCP-6 |
+| 07 / AWC-7 | AWCP-8 | Identity, metadata-only Secret prerequisite, no workload RBAC | Unit/envtest missing/restore; kind authorization smoke | AWCP-6 |
 | 08 / AWC-8 | AWCP-9 | Ingress policy generation and toggles | Unit/envtest; CNI enforcement only with separate profile | AWCP-6 |
 | 09 / AWC-9 | AWCP-10 | Status, generation gates, reason/event model | Truth-table unit + no-op/status envtest | AWCP-6, 7, 8, 9 |
 | 10 / AWC-10 | AWCP-11 | Metrics, structured logs, dashboard, Collector example | Counter/gauge/outage checks and dashboard demo | AWCP-5, 10 |

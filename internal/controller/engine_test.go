@@ -242,7 +242,7 @@ func TestFailureClassificationConditionsAndRecovery(t *testing.T) {
 		{"Forbidden", apierrors.NewForbidden(gr, "child", private), false}, {"Timeout", apierrors.NewTimeoutError(private.Error(), 1), false},
 		{"Throttled", apierrors.NewTooManyRequests(private.Error(), 1), false}, {"UnexpectedError", private, false},
 		{"ResourceOwnershipConflict", ErrOwnershipConflict, true}, {"InvalidConfiguration", ErrInvalidPlan, true},
-		{"ImmutableSelector", resource.ErrImmutableSelector, true}, {"ImmutableServiceAllocation", resource.ErrImmutableServiceAllocation, true},
+		{"ImmutableSelector", resource.ErrImmutableSelector, true}, {"ImmutableServiceAllocation", resource.ErrImmutableServiceAllocation, true}, {"SecretNotFound", ErrSecretNotFound, true},
 		{"APIInvalid", apierrors.NewInvalid(schema.GroupKind{Group: "apps", Kind: "Deployment"}, "child", field.ErrorList{field.Invalid(field.NewPath("spec"), "synthetic-invalid", private.Error())}), true},
 	}
 	for _, tc := range cases {

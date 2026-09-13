@@ -1,6 +1,6 @@
 # ADR-005 — Security and Secret Boundaries
 
-Status: Accepted design. Date: 2026-09-12. Tracking: AWCP-2.
+Status: Implemented for V0 identity/Secret prerequisite boundary. Date: 2026-09-12. Tracking: AWCP-2, AWCP-8.
 
 ## Context
 
@@ -36,7 +36,7 @@ Using default ServiceAccount obscures identity; granting workload cluster roles 
 
 ## Validation and revisit trigger
 
-AWCP-8 verifies manager/workload permissions and Secret restore without editing the parent. Negative leakage tests use synthetic values; kind tests prove runtime identity. Ownership conflict and API Forbidden must not be mislabeled SecretNotFound.
+AWCP-8 verifies manager/workload permissions and Secret restore without editing the parent. Unit/envtest negative leakage tests use synthetic values; the kind smoke checks workload authorization. Ownership conflict and API Forbidden are not mislabeled `SecretNotFound`.
 
 ## References
 

@@ -70,6 +70,11 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 		message = "The owned Service has an incompatible immutable cluster allocation; administrative resolution is required. Automatic deletion or replacement is disabled."
 		permanent = true
 	}
+	if errors.Is(cause, ErrSecretNotFound) {
+		reason = "SecretNotFound"
+		message = "One or more referenced Secrets are unavailable in the workload namespace."
+		permanent = true
+	}
 	before := p.DeepCopy()
 	for _, typ := range []string{"Ready", "Progressing", "Degraded"} {
 		value := metav1.ConditionUnknown
@@ -101,7 +106,7 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 // Recovery clears only this foundation's failure marker, never declares a workload Ready.
 func (r *AIWorkloadReconciler) clearFailure(ctx context.Context, p *platformv1alpha1.AIWorkload) error {
 	c := meta.FindStatusCondition(p.Status.Conditions, "Degraded")
-	if c == nil || (c.Reason != "ResourceOwnershipConflict" && c.Reason != "InvalidConfiguration" && c.Reason != "ReconcileFailed") {
+	if c == nil || (c.Reason != "ResourceOwnershipConflict" && c.Reason != "InvalidConfiguration" && c.Reason != "ReconcileFailed" && c.Reason != "SecretNotFound") {
 		return nil
 	}
 	before := p.DeepCopy()

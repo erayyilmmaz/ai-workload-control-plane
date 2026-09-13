@@ -74,6 +74,9 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			logger.V(1).Info("Reconciled child", "kind", childOrder(intent.Object), "outcome", outcome)
 		}
 	}
+	if err == nil {
+		err = r.validateSecretReferences(ctx, &workload)
+	}
 	if errors.Is(err, ErrChildDeleting) {
 		return ctrl.Result{RequeueAfter: 2 * time.Second}, nil
 	}

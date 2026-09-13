@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Manager/container plus Deployment/Service-contract smoke; full ready-pod traffic E2E belongs to AWCP-14.
+# Manager/container plus identity/Deployment/Service-contract smoke; full ready-pod traffic E2E belongs to AWCP-14.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-image="${1:-awcp-manager:awcp-7}"
+image="${1:-awcp-manager:awcp-8}"
 for tool in kind kubectl; do
   test -x ".tools/bin/$tool" || bash hack/bootstrap-tools.sh "$tool"
 done
@@ -98,9 +98,12 @@ while test "$i" -lt 30; do
   sleep 1
 done
 test "${actual_endpoint:-}" = "$endpoint"
-# AWCP-8 deliberately creates this identity; AWCP-6/7 only bind its future name.
-if "$kubectl" -n awcp-workloads get "serviceaccount/$child" >/dev/null 2>&1; then
-  echo 'AWCP-7 must not create the dedicated ServiceAccount before AWCP-8' >&2
+"$kubectl" -n awcp-workloads get "serviceaccount/$child" -o json | jq -e --arg child "$child" --arg uid "$workload_uid" '
+  .metadata.ownerReferences == [{apiVersion:"platform.example.io/v1alpha1", kind:"AIWorkload", name:"bootstrap-sample", uid:$uid, controller:true, blockOwnerDeletion:false}] and
+  .automountServiceAccountToken == false and
+  .secrets == null and .imagePullSecrets == null'
+if "$kubectl" -n awcp-workloads get rolebinding -o json | jq -e --arg child "$child" '[.items[] | select(any(.subjects[]?; .kind == "ServiceAccount" and .name == $child))] | length == 0' >/dev/null; then :; else
+  echo 'AWCP-8 must not grant workload ServiceAccounts through RoleBindings' >&2
   exit 1
 fi
 identity=system:serviceaccount:awcp-system:awcp-controller-manager
@@ -115,7 +118,12 @@ for rule in 'create secrets' 'delete deployments.apps' 'delete serviceaccounts' 
   answer="$("$kubectl" auth can-i $rule -n awcp-workloads --as="$identity" || true)"
   test "$answer" = no
 done
+workload_identity="system:serviceaccount:awcp-workloads:$child"
+for rule in 'get secrets' 'get pods' 'create pods'; do
+  answer="$("$kubectl" auth can-i $rule -n awcp-workloads --as="$workload_identity" || true)"
+  test "$answer" = no
+done
 answer="$("$kubectl" auth can-i get aiworkloads.platform.example.io -n default --as="$identity" || true)"
 test "$answer" = no
 "$kubectl" -n awcp-system logs deployment/awcp-controller-manager --tail=30
-echo 'PASS: manager security, health/readiness, Lease, Deployment/Service contracts, endpoint and foundation RBAC'
+echo 'PASS: manager security, health/readiness, Lease, identity/Deployment/Service contracts, endpoint and least-privilege RBAC'

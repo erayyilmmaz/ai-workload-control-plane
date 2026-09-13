@@ -3,9 +3,11 @@ package reconciliation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +31,17 @@ import (
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/manager"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/resource"
 )
+
+func deploymentIntent(t *testing.T, plan []resource.Intent) resource.Intent {
+	t.Helper()
+	for _, intent := range plan {
+		if _, ok := intent.Object.(*appsv1.Deployment); ok {
+			return intent
+		}
+	}
+	t.Fatal("Deployment intent missing")
+	return resource.Intent{}
+}
 
 func TestProductionDeployment(t *testing.T) {
 	if testing.Short() {
@@ -75,6 +88,11 @@ func TestProductionDeployment(t *testing.T) {
 		return p
 	}
 	alpha, beta, collision := create("alpha"), create("beta"), create("immutable")
+	for _, name := range []string{"first", "second"} {
+		if err := api.Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "workloads"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// Valid, current-UID-owned Deployment with a different immutable selector.
 	legacy := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: resource.ChildName(collision.Name), Namespace: collision.Namespace, OwnerReferences: []metav1.OwnerReference{{APIVersion: platform.GroupVersion.String(), Kind: "AIWorkload", Name: collision.Name, UID: collision.UID, Controller: ptr.To(true), BlockOwnerDeletion: ptr.To(false)}}}, Spec: appsv1.DeploymentSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"legacy": "yes"}}, Template: corev1.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"legacy": "yes"}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: resource.ContainerName, Image: "example.invalid/legacy:v1"}}}}}}
 	if err := api.Create(ctx, legacy); err != nil {
@@ -115,7 +133,7 @@ func TestProductionDeployment(t *testing.T) {
 				return err
 			}
 			expected := d.DeepCopy()
-			if err := plan[0].Mutate(expected); err != nil {
+			if err := deploymentIntent(t, plan).Mutate(expected); err != nil {
 				return err
 			}
 			if !apiequality.Semantic.DeepEqual(&d, expected) {
@@ -166,8 +184,12 @@ func TestProductionDeployment(t *testing.T) {
 		if len(alpha.Spec.Resources.Requests) != 0 {
 			t.Fatal("Deployment defaulting modified primary")
 		}
-		if err := api.Get(ctx, keyFor(alpha), &corev1.ServiceAccount{}); !apierrors.IsNotFound(err) {
-			t.Fatalf("AWCP-6 must not create identity yet: %v", err)
+		var identity corev1.ServiceAccount
+		if err := api.Get(ctx, keyFor(alpha), &identity); err != nil {
+			t.Fatalf("AWCP-8 must create dedicated identity: %v", err)
+		}
+		if ptr.Deref(identity.AutomountServiceAccountToken, true) || metav1.GetControllerOf(&identity) == nil || metav1.GetControllerOf(&identity).UID != alpha.UID {
+			t.Fatal("dedicated ServiceAccount identity contract wrong")
 		}
 		eventually(t, "AWCP-7 Service contract", func() error {
 			var service corev1.Service
@@ -230,7 +252,7 @@ func TestProductionDeployment(t *testing.T) {
 			t.Fatal(err)
 		}
 		for range 5 {
-			outcome, err := engine.Apply(ctx, alpha, plan[0])
+			outcome, err := engine.Apply(ctx, alpha, deploymentIntent(t, plan))
 			if err != nil || outcome != controller.Unchanged {
 				t.Fatalf("expected API-default-safe no-op: %s %v", outcome, err)
 			}
@@ -314,6 +336,69 @@ func TestProductionDeployment(t *testing.T) {
 			}
 			return nil
 		})
+	})
+	t.Run("Secret missing restore delete and restore update only safe status", func(t *testing.T) {
+		workload := &platform.AIWorkload{ObjectMeta: metav1.ObjectMeta{Name: "secret-lifecycle", Namespace: "workloads"}, Spec: platform.AIWorkloadSpec{
+			Image: "example.invalid/secret-lifecycle:v1", Container: platform.ContainerSpec{Port: 8080}, SecretRefs: []platform.SecretReference{"restore-me"},
+		}}
+		if err := api.Create(ctx, workload); err != nil {
+			t.Fatal(err)
+		}
+		key := client.ObjectKeyFromObject(workload)
+		generation := workload.Generation
+		assertMissing := func() {
+			t.Helper()
+			eventually(t, "missing Secret condition", func() error {
+				var actual platform.AIWorkload
+				if err := api.Get(ctx, key, &actual); err != nil {
+					return err
+				}
+				condition := meta.FindStatusCondition(actual.Status.Conditions, "Degraded")
+				ready := meta.FindStatusCondition(actual.Status.Conditions, "Ready")
+				if condition == nil || condition.Status != metav1.ConditionTrue || condition.Reason != "SecretNotFound" || ready == nil || ready.Status != metav1.ConditionFalse || actual.Generation != generation {
+					return errors.New("missing Secret condition has not converged")
+				}
+				return nil
+			})
+		}
+		assertMissing()
+		var account corev1.ServiceAccount
+		if err := api.Get(ctx, keyFor(workload), &account); err != nil || ptr.Deref(account.AutomountServiceAccountToken, true) {
+			t.Fatalf("identity must exist even while Secret is missing: %v", err)
+		}
+		const sentinel = "AWCP-8-SENTINEL-MUST-NOT-LEAK"
+		secret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "restore-me", Namespace: workload.Namespace}, Data: map[string][]byte{"token": []byte(sentinel)}}
+		if err := api.Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: secret.Name, Namespace: secret.Namespace}, Data: secret.Data}); err != nil {
+			t.Fatal(err)
+		}
+		assertRecovered := func() {
+			t.Helper()
+			eventually(t, "Secret recovery condition", func() error {
+				var actual platform.AIWorkload
+				if err := api.Get(ctx, key, &actual); err != nil {
+					return err
+				}
+				degraded := meta.FindStatusCondition(actual.Status.Conditions, "Degraded")
+				ready := meta.FindStatusCondition(actual.Status.Conditions, "Ready")
+				serialized, err := json.Marshal(actual.Status)
+				if err != nil {
+					return err
+				}
+				if degraded == nil || degraded.Status != metav1.ConditionFalse || ready == nil || ready.Status != metav1.ConditionUnknown || strings.Contains(string(serialized), sentinel) || actual.Generation != generation {
+					return errors.New("Secret recovery or status redaction has not converged")
+				}
+				return nil
+			})
+		}
+		assertRecovered()
+		if err := api.Delete(ctx, secret); err != nil {
+			t.Fatal(err)
+		}
+		assertMissing()
+		if err := api.Create(ctx, &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: secret.Name, Namespace: secret.Namespace}, Data: secret.Data}); err != nil {
+			t.Fatal(err)
+		}
+		assertRecovered()
 	})
 	t.Run("replicas 1 to 2 to 0 does not change template", func(t *testing.T) {
 		template := current.Spec.Template.DeepCopy()
@@ -400,7 +485,7 @@ func TestProductionDeployment(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := engine.Apply(ctx, collision, plan[0]); !errors.Is(err, resource.ErrImmutableSelector) {
+		if _, err := engine.Apply(ctx, collision, deploymentIntent(t, plan)); !errors.Is(err, resource.ErrImmutableSelector) {
 			t.Fatalf("wrong immutable error: %v", err)
 		}
 		var actualOther appsv1.Deployment

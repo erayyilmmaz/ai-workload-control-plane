@@ -16,9 +16,10 @@ Missing/deleting parent stops work. Writes are sequential, not atomic; a retry
 resumes from API state. No finalizer, database, force update or adoption is added.
 
 `manager.Options.Builder` is the internal composition point. If unset, the manager
-uses `WorkloadBuilder`, which emits AWCP-6 Deployment and AWCP-7 optional Service
-intents. `test/fixtures.Plan` remains deliberately incomplete and only supports
-AWCP-5 engine tests. AWCP-8/9 add the remaining production children; AWCP-10 observes readiness. An optional controller name
+uses `WorkloadBuilder`, which emits AWCP-8 ServiceAccount, AWCP-6 Deployment and
+AWCP-7 optional Service intents. `test/fixtures.Plan` remains deliberately incomplete
+and only supports AWCP-5 engine tests. AWCP-9 adds the remaining production child;
+AWCP-10 observes readiness. An optional controller name
 allows tests to restart managers sequentially without disabling the runtime's
 process-global name uniqueness validation; the shipped name stays `aiworkload`.
 
@@ -54,9 +55,9 @@ not every future production field mapping.
   spec changes, deletion and Deployment status updates reach the parent.
 - `WatchesMetadata` and the namespace-local `spec.secretRefs` index map Secret
   events only to referencing parents, including deletion. No Secret payload is
-  read by this foundation and no Secret is written. RBAC cannot distinguish
+  requested by the AWCP-8 metadata validation path and no Secret is written. RBAC cannot distinguish
   metadata from payload reads; it is not a content-isolation boundary. AWCP-8
-  implements actual prerequisite decisions.
+  implements missing/restore prerequisite decisions.
 - Out-of-scope reconcile and Secret requests are ignored. Cache scope remains
   exactly `WATCH_NAMESPACE`; Lease scope remains `MANAGER_NAMESPACE`.
 

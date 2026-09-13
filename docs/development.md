@@ -1,12 +1,11 @@
-# Local development — Service discovery stage
+# Local development — Workload identity and Secret prerequisite stage
 
 This checkout contains a real, buildable Kubebuilder scaffold. It is **not yet a
-workload operator**: the manager reconciles one guarded Deployment and optional
-cluster-local Service, but does not yet create its dedicated ServiceAccount or
-NetworkPolicy, nor does it publish workload readiness. Samples therefore create a
-Deployment and Service that can remain at `FailedCreate` until AWCP-8 provides its
-identity. Tests cover the Deployment/Service contracts, ownership, no-op, drift and
-restart; never use the placeholder samples as an application deployment.
+workload operator**: the manager reconciles one guarded Deployment, optional
+cluster-local Service and dedicated tokenless ServiceAccount, but does not yet
+create NetworkPolicy or publish workload readiness. It validates referenced Secret
+metadata and reports a missing prerequisite without reading Secret payloads. Samples
+still use placeholder images, so never use them as an application deployment.
 
 ## Prerequisites and first setup
 
@@ -111,10 +110,11 @@ failure rather than retrying a failed shutdown away.
 - AWCP-6 resource tests: deterministic Deployment mapping, fixed selector,
   resource/probe/Secret/security mapping, scale-vs-template semantics, immutable
   selector guard, input/output isolation and quantity validation.
-- AWCP-6/7 production envtest: default manager composition, create/patch/no-op,
+- AWCP-6/7/8 production envtest: default manager composition, create/patch/no-op,
   real API defaults, Deployment metadata/sidecar preservation, ClusterIP Service
-  mapping and endpoint status, immutable conflict condition, deleted Deployment
-  recovery and unrelated-parent isolation.
+  mapping, dedicated ServiceAccount and endpoint status; missing/restore/delete/
+  restore Secret lifecycle, immutable conflict condition, deleted Deployment recovery
+  and unrelated-parent isolation.
 - Kind smoke: image UID 65532, restricted runtime security, real health/readiness,
   manager rollout, leadership, created Deployment/Service contracts, endpoint and
   positive/negative foundation authorization. It intentionally does not wait for
@@ -140,7 +140,7 @@ escalation, uses RuntimeDefault seccomp and a read-only root filesystem; the
 manager needs no writable mount. Its ServiceAccount token remains mounted because
 it must contact Kubernetes. Future workload identities are a separate boundary.
 
-`IMG` defaults to `awcp-manager:awcp-7`; override it consistently for build/smoke.
+`IMG` defaults to `awcp-manager:awcp-8`; override it consistently for build/smoke.
 `REVISION` defaults to the current Git HEAD; before a source commit it identifies
 the parent, not the uncommitted source. Rebuild with the committed revision when
 producing an attributable image. The local image is not a published release.

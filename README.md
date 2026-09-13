@@ -2,7 +2,7 @@
 
 A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
 
-**Stage: Service discovery and exposure lifecycle (AWCP-7). The manager creates and repairs a guarded Deployment plus optional cluster-local Service; identity completion and workload readiness follow in later milestones.**
+**Stage: Workload identity and Secret prerequisites (AWCP-8). The manager creates a guarded Deployment, optional cluster-local Service and dedicated unprivileged ServiceAccount; workload readiness follows in later milestones.**
 
 An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
 
@@ -58,22 +58,25 @@ AWCP-4 defines typed spec/status, API-server defaults and schema/CEL validation.
 AWCP-5 adds deterministic plans, guarded create/patch/delete/no-op, child watches,
 Secret metadata indexing, failure conditions/events and retry semantics. AWCP-6
 activates the production Deployment mapping: image, replicas, resource quantities,
-HTTP probes, ordered Secret `envFrom`, future dedicated ServiceAccount binding,
+HTTP probes, ordered Secret `envFrom`, dedicated ServiceAccount binding,
 security defaults and rollout strategy. AWCP-7 adds a single TCP ClusterIP
 Service, deterministic in-cluster discovery endpoint, guarded enable/disable
 deletion and allocated-address preservation. Dedicated ServiceAccount creation,
 NetworkPolicy, complete dependency checks and workload readiness remain subsequent
-work. Applying a sample now creates a Deployment and Service, but not yet a fully
-runnable workload because its dedicated identity is introduced in AWCP-8.
+work. AWCP-8 creates the dedicated tokenless identity and validates referenced
+Secret metadata without reading payloads; missing Secrets receive a safe condition
+and Secret restore requeues without CR edits. NetworkPolicy and workload readiness
+remain subsequent work.
 Metrics, application lifecycle E2E, hosted CI and releases
 remain future work. See [AWCP-2 design evidence](docs/verification/AWCP-2.md) and
 [AWCP-3 execution evidence](docs/verification/AWCP-3.md) and
 [AWCP-4 contract evidence](docs/verification/AWCP-4.md) and
 [AWCP-5 foundation evidence](docs/verification/AWCP-5.md).
 [AWCP-6 deployment evidence](docs/verification/AWCP-6.md) and
-[AWCP-7 Service evidence](docs/verification/AWCP-7.md).
+[AWCP-7 Service evidence](docs/verification/AWCP-7.md) and
+[AWCP-8 identity evidence](docs/verification/AWCP-8.md).
 
-The next milestone is AWCP-8 — workload identity, Secret references and least-privilege security.
+The next milestone is AWCP-9 — network isolation and NetworkPolicy reconciliation.
 Each completed development step is validated, committed and pushed before moving on.
 
 The [original Jira backlog export](docs/backlog/awcp-v0.md) is a dated planning snapshot. Current architecture documents and the version lock supersede its provisional choices; corrections are listed in the compatibility document.

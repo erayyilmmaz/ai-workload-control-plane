@@ -1,8 +1,9 @@
 # AIWorkload API and status contract
 
 Types, structural schema, defaults and admission tests were implemented in AWCP-4.
-AWCP-7 implements the Service endpoint portion of the status contract; full lifecycle
-and readiness status remain later work.
+AWCP-7 implements the Service endpoint portion of the status contract; AWCP-8
+implements missing-Secret prerequisite conditions. Full lifecycle/readiness status
+remains later work.
 
 ## API identity
 
@@ -85,9 +86,10 @@ is round-tripped via `/status` by tests; it is not a real readiness report.
 Writes to `/status` cannot modify spec or advance generation. Main-resource creation
 discards supplied status, and ordinary spec updates preserve existing status and
 advance generation for spec changes. These are real API-server tests, with no AWCP
-controller running. The controller has status permission and AWCP-7 writes `endpoint`
-only after a successful enabled Service apply (or clears it when Service is disabled).
-The full condition/readiness reducer remains AWCP-10.
+controller running. The controller has status permission. AWCP-7 writes `endpoint`
+only after a successful enabled Service apply (or clears it when Service is disabled);
+AWCP-8 writes generic `SecretNotFound` failure/recovery conditions. The full
+condition/readiness reducer remains AWCP-10.
 
 | Evaluated state | Ready | Progressing | Degraded | Primary reason |
 | --- | --- | --- | --- | --- |

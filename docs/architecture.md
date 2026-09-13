@@ -2,10 +2,9 @@
 
 Status: accepted design, AWCP-2, 2026-09-12. AWCP-5 implements the shared engine,
 ownership guard, watch/index wiring and bounded failure reporting; AWCP-6 implements
-the Deployment mapping in [deployment lifecycle](deployment.md). Service/NetworkPolicy,
-dedicated ServiceAccount creation, Secret prerequisites and complete observed status
-remain later milestones. This document remains the target contract, not a claim of
-full implementation.
+the Deployment mapping, AWCP-7 the optional Service, and AWCP-8 dedicated identity
+plus Secret prerequisites. NetworkPolicy and complete observed status remain later
+milestones. This document remains the target contract, not a claim of full implementation.
 
 ## Control plane boundary
 
@@ -71,11 +70,11 @@ Use read/compare/merge-patch with optimistic concurrency. Compare semantic desir
 flowchart TD
   Fetch[Fetch primary] --> Guard{Missing or deleting?}
   Guard -- yes --> Stop[Return without creating children]
-  Guard -- no --> Prereq[Check namespace / references / ownership]
-  Prereq --> Identity[Reconcile ServiceAccount]
+  Guard -- no --> Identity[Reconcile ServiceAccount]
   Identity --> Deployment[Reconcile Deployment]
   Deployment --> Optional[Reconcile Service and NetworkPolicy toggles]
-  Optional --> Observe[Read current Deployment and dependency state]
+  Optional --> Prereq[Check Secret metadata prerequisites]
+  Prereq --> Observe[Read current Deployment and dependency state]
   Observe --> Status[Patch status only when changed]
   Status --> Return[Return or framework backoff]
 ```

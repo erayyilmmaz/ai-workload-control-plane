@@ -42,6 +42,7 @@ func (WorkloadBuilder) Build(p *platform.AIWorkload) ([]Intent, error) {
 	if err != nil {
 		return nil, err
 	}
+	identity := serviceAccountIntent(desired)
 	deployment := Intent{Object: &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: ChildName(p.Name), Namespace: p.Namespace}}, Mutate: func(o client.Object) error {
 		d, ok := o.(*appsv1.Deployment)
 		if !ok {
@@ -53,7 +54,7 @@ func (WorkloadBuilder) Build(p *platform.AIWorkload) ([]Intent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []Intent{deployment, service}, nil
+	return []Intent{identity, deployment, service}, nil
 }
 
 // SelectorLabels returns fresh stable identity labels, independent of generation/image.
