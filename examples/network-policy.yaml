@@ -1,0 +1,16 @@
+# This object proves NetworkPolicy generation. Enforcement depends on the cluster CNI.
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: network-demo
+  namespace: awcp-workloads
+spec:
+  image: awcp-demo:v1
+  replicas: 1
+  container:
+    port: 8080
+  service:
+    enabled: true
+    port: 80
+  network:
+    enabled: true

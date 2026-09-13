@@ -16,7 +16,7 @@ required status checks after a repository ruleset is configured:
 | `format` | Formatting diff check |
 | `lint` / `vet` | Static analysis |
 | `generate-check` / `manifest-check` | Generated DeepCopy and CRD/RBAC drift, including untracked files |
-| `unit-test` / `envtest` | Fast and API-server-backed suites |
+| `unit-test` / `envtest` | Fast/public-documentation guard and API-server-backed suites |
 | `build` / `docker-build` | Binary and digest-pinned container build |
 | `supply-chain` | Module tidiness, govulncheck, release-package and workflow-boundary checks |
 | `e2e` | Full disposable kind lifecycle, package deploy and safe undeploy |

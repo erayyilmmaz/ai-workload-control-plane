@@ -39,6 +39,10 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+demo_step() {
+  printf '\n== AWCP portfolio demo %s/16: %s ==\n' "$1" "$2"
+}
+
 wait_workload_ready() {
   local replicas="$1" state attempt
   for attempt in $(seq 1 90); do
@@ -113,6 +117,7 @@ created=true
 make deploy DEPLOY_IMG="$manager_image"
 "$kubectl" apply -f examples/observability/metrics-reader-clusterrole.yaml
 "$kubectl" apply -f test/e2e/metrics-reader.yaml
+demo_step 1 'create AIWorkload'
 "$kubectl" -n awcp-workloads create secret generic demo-settings --from-literal=marker=synthetic
 "$kubectl" apply -f test/e2e/demo-workload.yaml
 workload=lifecycle-demo
@@ -120,11 +125,26 @@ hash="$(printf '%s' "$workload" | shasum -a 256 | awk '{print substr($1, 1, 16)}
 child="awcp-$workload-$hash"
 
 # Create, rollout, scale, service traffic.
+demo_step 2 'owned Deployment appears'
+"$kubectl" -n awcp-workloads wait --for=create "deployment/$child" --timeout=90s
+demo_step 3 'owned Service appears'
+"$kubectl" -n awcp-workloads wait --for=create "service/$child" --timeout=90s
+demo_step 4 'workload becomes Ready and serves v1'
 "$kubectl" -n awcp-workloads rollout status "deployment/$child" --timeout=180s
 wait_workload_ready 1
 for owned in "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child"; do "$kubectl" -n awcp-workloads get "$owned" >/dev/null; done
 assert_version v1
+deployment_uid="$("$kubectl" -n awcp-workloads get "deployment/$child" -o jsonpath='{.metadata.uid}')"
+demo_step 5 'manually delete the owned Deployment'
+"$kubectl" -n awcp-workloads delete "deployment/$child"
+demo_step 6 'wait for reconciliation to restore a new Deployment UID'
+wait_new_uid "deployment/$child" "$deployment_uid"
+"$kubectl" -n awcp-workloads rollout status "deployment/$child" --timeout=180s
+wait_workload_ready 1
+assert_version v1
+demo_step 7 'change workload image from v1 to v2'
 "$kubectl" -n awcp-workloads patch aiworkload/lifecycle-demo --type=merge -p '{"spec":{"image":"awcp-demo:v2"}}'
+demo_step 8 'wait for rollout and verify Service HTTP v2'
 "$kubectl" -n awcp-workloads rollout status "deployment/$child" --timeout=180s
 wait_workload_ready 1
 assert_version v2
@@ -134,11 +154,6 @@ wait_workload_ready 2
 assert_version v2
 
 # Child drift before and after manager restart.
-deployment_uid="$("$kubectl" -n awcp-workloads get "deployment/$child" -o jsonpath='{.metadata.uid}')"
-"$kubectl" -n awcp-workloads delete "deployment/$child"
-wait_new_uid "deployment/$child" "$deployment_uid"
-"$kubectl" -n awcp-workloads rollout status "deployment/$child" --timeout=180s
-wait_workload_ready 2
 "$kubectl" -n awcp-system rollout restart deployment/awcp-controller-manager
 "$kubectl" -n awcp-system rollout status deployment/awcp-controller-manager --timeout=180s
 for resource in "service/$child" "serviceaccount/$child" "networkpolicy/$child"; do old_uid="$("$kubectl" -n awcp-workloads get "$resource" -o jsonpath='{.metadata.uid}')"; "$kubectl" -n awcp-workloads delete "$resource"; wait_new_uid "$resource" "$old_uid"; done
@@ -146,13 +161,20 @@ wait_workload_ready 2
 assert_version v2
 
 # Secret payload is not queried or printed.
+demo_step 9 'remove the required user-owned Secret'
 "$kubectl" -n awcp-workloads delete secret/demo-settings
+demo_step 10 'observe SecretNotFound degradation'
 wait_secret_failure
+demo_step 11 'restore the Secret without changing the AIWorkload'
 "$kubectl" -n awcp-workloads create secret generic demo-settings --from-literal=marker=synthetic
+demo_step 12 'wait for Ready recovery'
 wait_workload_ready 2
+demo_step 13 'optional Grafana view (dashboard import is documented; base install does not deploy Grafana)'
+demo_step 14 'read authenticated controller metrics with least privilege'
 assert_metrics
 
 # Normal package removal preserves the CRD, workload tree, namespace and user Secret.
+echo 'Additional safety check: normal package removal preserves workload data and the CRD.'
 make undeploy
 "$kubectl" get crd/aiworkloads.platform.example.io >/dev/null
 "$kubectl" -n awcp-workloads get "aiworkload/$workload" "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child" secret/demo-settings >/dev/null
@@ -162,7 +184,9 @@ if "$kubectl" -n awcp-system get deployment/awcp-controller-manager >/dev/null 2
 fi
 
 # GC still removes owned objects after an explicit parent deletion.
+demo_step 15 'delete AIWorkload'
 "$kubectl" -n awcp-workloads delete aiworkload/lifecycle-demo --wait=false
+demo_step 16 'wait for owned children to disappear and verify user Secret survives'
 for owned in "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child"; do "$kubectl" -n awcp-workloads wait --for=delete "$owned" --timeout=90s; done
 "$kubectl" -n awcp-workloads wait --for=delete aiworkload/lifecycle-demo --timeout=90s
 for kind_name in replicasets pods; do

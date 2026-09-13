@@ -1,110 +1,211 @@
 # AI Workload Control Plane
 
-A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
+A Go-based Kubernetes operator that turns one namespaced `AIWorkload` desired-state
+resource into a managed HTTP workload lifecycle.
 
-**Stage: CI quality gates and supply-chain hygiene (AWCP-16). Secrets-free GitHub Actions gates passed once on hosted Linux AMD64; active branch ruleset/merge blocking remains separate evidence.**
+**Stage: V0 release preparation (AWCP-17).** The local demo and hosted CI are
+validated; no Git tag, GitHub Release or production image has been published.
 
-An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
+## Problem
+
+Running an AI-adjacent HTTP application on Kubernetes commonly means manually
+keeping a Deployment, Service, workload identity and NetworkPolicy aligned. Those
+objects drift independently, and failures such as a missing Secret are difficult to
+surface consistently.
+
+## Why this exists
+
+`AIWorkload` gives a developer one namespaced desired-state object. The controller
+observes it and manages only its derived children: Deployment, optional ClusterIP
+Service, dedicated tokenless ServiceAccount and optional ingress-only
+NetworkPolicy. The workload image supplies application or AI behavior; AWCP never
+runs a model, agent, prompt or external AI credential itself.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-  User[Developer] --> CR[AIWorkload: desired spec]
-  CR --> API[Kubernetes API]
-  API <--> Controller[Go controller]
-  Controller --> Children[Deployment / Service / ServiceAccount / NetworkPolicy]
-  Children --> Controller
-  Controller --> Status[Status / Conditions / Events]
+  Developer -->|apply AIWorkload| API[Kubernetes API]
+  API <--> Controller[AWCP controller]
+  Controller --> Deployment
+  Controller --> Service
+  Controller --> ServiceAccount
+  Controller --> NetworkPolicy
+  Controller --> Status[Status, Conditions, Events]
   Controller --> Metrics[Prometheus metrics]
-  Metrics --> Grafana[Grafana]
+  Metrics -. optional .-> Grafana[Grafana]
 ```
 
-## Start here
+## Key concepts
 
-1. [Scope and supported use cases](docs/scope.md)
-2. [Architecture, ownership and reconciliation](docs/architecture.md)
-3. [API and status contract](docs/api-contract.md)
-4. [Exact version matrix and verification limits](docs/compatibility.md)
-5. [Architecture decision records](docs/adr/README.md)
-6. [Acceptance and backlog traceability](docs/traceability.md)
-7. [Test strategy and evidence boundaries](docs/testing.md)
+- **Spec is desired state; status is observed state.** Kubernetes remains the only
+  source of truth; there is no AWCP database or broker.
+- **Ownership is narrow.** AWCP owns only the current CR's child tree. It never
+  adopts a foreign resource and never owns, logs or deletes user Secrets.
+- **Ready is a Kubernetes lifecycle signal.** It does not validate a model,
+  external provider, credential value or public endpoint.
 
-The machine-readable selection is [toolchain.lock.json](toolchain.lock.json); exact runtime/test dependencies are resolved in `go.mod` and `go.sum`. See [local setup and commands](docs/development.md) before running anything.
+## Quick Start
+
+This is a source checkout demo for a deliberately new local kind cluster. It needs
+Docker, network access for pinned tool/image downloads, and a shell with `git` and
+`make`. No cloud account, registry credential or AI credential is used.
 
 ```bash
+git clone https://github.com/erayyilmmaz/ai-workload-control-plane.git
+cd ai-workload-control-plane
 make bootstrap
-make verify
-make test-race
-make docker-build
-make smoke
-make e2e
-make release-bundle
-make verify-package
-make verify-ci
-make vuln
+make quickstart
 ```
 
-Bootstrap installs checksum-verified tools into this checkout. Both kind targets
-use only their own temporary cluster and kubeconfig, then remove them. `make e2e`
-also builds local demo v1/v2 images and proves real workload traffic, updates and
-recovery. Initial tool/image downloads need network access. Full prerequisites and
-test boundaries are in the development guide.
+`make quickstart` creates `awcp-quickstart`, builds local non-production manager
+and demo images, loads them into kind, deploys AWCP, applies
+[`examples/basic.yaml`](examples/basic.yaml), and waits for `Ready=True`.
 
-For an accessible immutable controller image, use the [installation guide](docs/installation.md). This repository does not yet publish a production image; local image tags are not a release quick start.
+```bash
+.tools/bin/kubectl -n awcp-workloads get aiworkloads,deployments,services
+.tools/bin/kubectl -n awcp-workloads get aiworkload/basic-demo -o yaml
+```
 
-## V0 boundaries
+Remove only that explicitly named demo cluster when finished:
 
-Included: one namespaced `AIWorkload` API, idempotent reconciliation, drift recovery, Secret references, workload identity, ingress policy generation, health probes, conditions/events, Prometheus/Grafana, an OpenTelemetry Collector example, unit/envtest/kind tests, Kustomize installation, CI and a reproducible local demo.
+```bash
+make kind-down
+```
 
-Excluded: frontend, REST management API, SaaS/accounts/billing, GPU scheduling, inference serving, LLM gateway/model routing, agent execution, vector database, PostgreSQL/Redis/message brokers, multi-cluster, cloud identity, Terraform, Argo CD, HPA, admission webhooks and full tenant isolation. Helm and traces are not V0 requirements. See the [scope decisions](docs/scope.md).
+For a narrated, disposable full lifecycle run (including drift, Secret recovery,
+authenticated metrics and garbage collection), run:
 
-This is an alpha portfolio project, not a production-ready platform. An `AIWorkload` creator can execute an image and reference Secrets in the allowed namespace. Dedicated identity and NetworkPolicy do not make that namespace a complete tenant security boundary.
+```bash
+make portfolio-demo
+```
 
-## Development status
+It creates a random `awcp-e2e-*` cluster and removes it automatically. See the
+[16-step demo guide](docs/demo.md) before presenting it.
 
-AWCP-2 defines the intended resource contract; AWCP-3 adds the Kubebuilder project,
-namespace-scoped manager, initial controller, local tooling, tests and container.
-AWCP-4 defines typed spec/status, API-server defaults and schema/CEL validation.
-AWCP-5 adds deterministic plans, guarded create/patch/delete/no-op, child watches,
-Secret metadata indexing, failure conditions/events and retry semantics. AWCP-6
-activates the production Deployment mapping: image, replicas, resource quantities,
-HTTP probes, ordered Secret `envFrom`, dedicated ServiceAccount binding,
-security defaults and rollout strategy. AWCP-7 adds a single TCP ClusterIP
-Service, deterministic in-cluster discovery endpoint, guarded enable/disable
-deletion and allocated-address preservation. Dedicated ServiceAccount creation,
-NetworkPolicy, complete dependency checks and workload readiness remain subsequent
-work. AWCP-8 creates the dedicated tokenless identity and validates referenced
-Secret metadata without reading payloads; missing Secrets receive a safe condition
-and Secret restore requeues without CR edits. AWCP-9 adds a standard, ingress-only
-NetworkPolicy for same-namespace pods to the named `http` port. It does not impose
-egress isolation or prove CNI enforcement. AWCP-10 adds generation-aware
-Deployment readiness, replica observations, reasoned failure conditions and bounded
-Events; it does not prove application traffic, DNS or CNI enforcement. AWCP-11 adds
-bounded metrics and optional observability artifacts without making telemetry a
-reconciliation dependency. AWCP-12 proves the no-finalizer deletion guard and
-kind-based garbage collection of the owned child tree while preserving user-owned
-Secrets. AWCP-13 adds the consolidated unit/envtest regression suite and a
-project-scoped coverage artefact. AWCP-14 adds a disposable kind lifecycle suite:
-real workload traffic, v1-to-v2 rollout, scale, child drift, Secret recovery,
-manager restart and garbage collection. AWCP-15 adds canonical Kustomize packaging
-and safe removal. AWCP-16 adds hosted CI quality gates; published images/releases
-and active merge-blocking rules remain future work. See
-[AWCP-2 design evidence](docs/verification/AWCP-2.md) and
-[AWCP-3 execution evidence](docs/verification/AWCP-3.md) and
-[AWCP-4 contract evidence](docs/verification/AWCP-4.md) and
-[AWCP-5 foundation evidence](docs/verification/AWCP-5.md).
-[AWCP-6 deployment evidence](docs/verification/AWCP-6.md) and
-[AWCP-7 Service evidence](docs/verification/AWCP-7.md) and
-[AWCP-8 identity evidence](docs/verification/AWCP-8.md) and
-[AWCP-9 NetworkPolicy evidence](docs/verification/AWCP-9.md) and
-[AWCP-10 status evidence](docs/verification/AWCP-10.md) and
-[AWCP-11 telemetry evidence](docs/verification/AWCP-11.md) and
-[AWCP-12 deletion evidence](docs/verification/AWCP-12.md) and
-[AWCP-13 suite evidence](docs/verification/AWCP-13.md) and
-[AWCP-14 E2E evidence](docs/verification/AWCP-14.md) and
-[AWCP-15 packaging evidence](docs/verification/AWCP-15.md) and
-[AWCP-16 CI evidence](docs/verification/AWCP-16.md).
+## AIWorkload API
 
-The next milestone is AWCP-17 — documentation, portfolio demo and V0 release preparation.
-Each completed development step is validated, committed and pushed before moving on.
+`AIWorkload` is `platform.example.io/v1alpha1`, namespaced, and intentionally
+alpha. A minimal runnable local example is [`examples/basic.yaml`](examples/basic.yaml).
 
-The [original Jira backlog export](docs/backlog/awcp-v0.md) is a dated planning snapshot. Current architecture documents and the version lock supersede its provisional choices; corrections are listed in the compatibility document.
+| Concern | V0 behavior |
+| --- | --- |
+| Image and replicas | Required image; replicas default to 1 and allow 0..20 |
+| HTTP | Required container port; optional `/ready` and `/health` probes |
+| Service | Optional TCP ClusterIP Service; enabled by default |
+| Secrets | Ordered same-namespace `envFrom` references; payload is never read by AWCP |
+| Network | Optional same-namespace ingress-only NetworkPolicy; no egress isolation |
+| Status | Generation, replica observations, endpoint and Ready/Progressing/Degraded conditions |
+
+The detailed field contract and validation boundaries are in
+[API contract](docs/api-contract.md).
+
+## Example
+
+To demonstrate a Secret prerequisite without committing a credential:
+
+```bash
+.tools/bin/kubectl -n awcp-workloads create secret generic demo-settings \
+  --from-literal=marker=synthetic
+.tools/bin/kubectl apply -f examples/with-secrets.yaml
+```
+
+[`examples/network-policy.yaml`](examples/network-policy.yaml) requests the
+standard ingress-only policy. Its existence is tested; traffic enforcement needs a
+CNI that enforces NetworkPolicy.
+
+## Reconciliation model
+
+```mermaid
+sequenceDiagram
+  participant D as Developer
+  participant K as Kubernetes API
+  participant C as AWCP Controller
+  participant W as Owned children
+  D->>K: apply or change AIWorkload
+  K->>C: reconcile event
+  C->>K: read desired state and referenced Secret metadata
+  C->>W: create or patch current-UID children
+  C->>K: write conditions, replicas and endpoint
+  W-->>C: watch event or observed rollout state
+```
+
+The controller uses guarded ownership and idempotent reconciliation. A same-name
+resource owned by another UID becomes `ResourceOwnershipConflict`, not an adopted
+or deleted object. See [architecture](docs/architecture.md) and
+[reconciliation](docs/reconciliation.md).
+
+## Drift recovery
+
+Deleting an owned Deployment or changing an owned child field causes a new
+reconciliation and restores the intended child. The portfolio demo visibly deletes
+the Deployment and waits for a new UID. It also confirms that a missing required
+Secret makes conditions Degraded and that restoring the Secret recovers without
+editing the parent CR. It does not claim that an already running process has its
+environment variables revoked or rotated.
+
+## Security model
+
+Each workload gets a dedicated ServiceAccount with token automount disabled and no
+RoleBinding. Pods run non-root with privilege escalation disabled, all capabilities
+dropped and `RuntimeDefault` seccomp. Secret references stay in the workload
+namespace and only their metadata is observed. Read the full
+[identity and Secret boundary](docs/identity-security.md) and
+[NetworkPolicy boundary](docs/network-policy.md).
+
+## Observability
+
+AWCP emits bounded structured logs, Kubernetes Events and authenticated Prometheus
+metrics. The base install does not deploy Prometheus, Grafana or an OpenTelemetry
+Collector. A Grafana dashboard and scrape/Collector examples are optional assets;
+the demo proves the underlying authenticated metrics endpoint. See
+[telemetry](docs/telemetry.md).
+
+## Testing strategy
+
+```bash
+make verify        # generated drift, build, vet, lint, format, unit/envtest and docs guard
+make verify-ci     # workflow-security structure guard
+make vuln          # reachable Go vulnerability analysis
+make e2e           # disposable real-kind lifecycle acceptance
+make release-bundle && make verify-package
+```
+
+Hosted GitHub Actions runs the stable quality gates, including Linux AMD64 kind E2E.
+Passing CI is not the same as an active merge-blocking ruleset; the repository
+currently has no active ruleset. Evidence and boundaries are recorded in
+[testing](docs/testing.md), [CI](docs/ci.md) and
+[AWCP-16 evidence](docs/verification/AWCP-16.md).
+
+## Architecture decisions
+
+The accepted tradeoffs are in [ADR-001 through ADR-008](docs/adr/README.md),
+including Kubernetes as source of truth, Go/controller-runtime, namespaced scope,
+ownership, least privilege, observability, alpha API versioning and no-finalizer
+deletion.
+
+## Limitations
+
+- Alpha portfolio project, not a production-ready platform or tenant boundary.
+- No GPU scheduling, inference serving, LLM gateway/model routing, agent runtime,
+  database, broker, cloud identity, HPA, webhook, multi-cluster or GitOps layer.
+- NetworkPolicy generation is proven; CNI traffic enforcement is not part of the
+  default kind profile. There is no egress policy.
+- No automatic Secret rotation/revocation for an already running process.
+- No published manager image, tag, GitHub Release, SBOM, signing or provenance yet.
+
+## Roadmap
+
+V0 implementation is complete pending human release authorization. The next
+authorized work should be a release decision: activate merge rules if desired,
+select a tested immutable manager image, run the release checklist, then create a
+tag/release only with the resulting digest and evidence. Future platform hardening
+(CNI enforcement, GitOps, cloud deployment, multi-tenancy) is out of V0 scope.
+
+## Further reading
+
+- [Installation, upgrade and safe removal](docs/installation.md)
+- [Release preparation checklist](docs/release.md)
+- [Scope and non-goals](docs/scope.md)
+- [Acceptance traceability](docs/traceability.md)
+- [All execution evidence](docs/verification/)

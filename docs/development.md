@@ -1,4 +1,4 @@
-# Local development — CI quality-gate stage
+# Local development — V0 release-preparation stage
 
 This checkout contains a real, buildable workload operator. The manager reconciles one
 guarded Deployment, optional cluster-local Service, dedicated tokenless ServiceAccount
@@ -67,6 +67,9 @@ cached module archives, so **bootstrap itself is not an offline workflow**.
 | `make undeploy` | Remove only manager/RBAC/metrics; preserve CRDs, namespaces and workloads |
 | `make release-bundle` / `make verify-package` | Build and structurally verify portable YAML/checksum artifacts without a cluster |
 | `make fmt-check` / `make verify-ci` | Check formatting and local GitHub Actions security/gate structure without GitHub |
+| `make quickstart` | Create an explicit local kind cluster, build/load local images, deploy AWCP and wait for the basic example |
+| `make portfolio-demo` | Run the narrated, disposable 16-step kind lifecycle; it does not reuse the current kube context |
+| `make verify-docs` | Check public README sections, demo/release material and safe examples structurally |
 | `make vuln` | Run pinned govulncheck; requires access to the Go vulnerability database |
 
 Use `make tidy` rather than plain `go mod tidy`: lazy loading can otherwise

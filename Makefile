@@ -25,9 +25,10 @@ VERSION ?= 0.1.0-dev
 DEPLOY_IMG ?=
 DEMO_IMG_V1 ?= awcp-demo:v1
 DEMO_IMG_V2 ?= awcp-demo:v2
+KIND_CLUSTER ?= awcp-quickstart
 REVISION ?= $(shell git rev-parse HEAD)
 
-.PHONY: bootstrap tools check-go tidy generate manifests fmt fmt-check build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated render docker-build demo-test demo-build smoke e2e kubectl install deploy undeploy release-bundle verify-package vuln verify-ci
+.PHONY: bootstrap tools check-go tidy generate manifests fmt fmt-check build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated verify-docs render docker-build demo-test demo-build smoke e2e portfolio-demo kind kubectl kind-up kind-load kind-down quickstart install deploy undeploy release-bundle verify-package vuln verify-ci
 bootstrap:
 	bash hack/bootstrap-tools.sh
 	$(MAKE) tools
@@ -87,9 +88,11 @@ coverage: check-go envtest
 	mkdir -p dist
 	$(GO) test -count=1 -covermode=atomic -coverpkg="$$($(GO) list ./... | paste -sd, -)" -coverprofile=dist/coverage.out ./...
 	$(GO) tool cover -func=dist/coverage.out > dist/coverage.txt
-verify: generate manifests build vet lint fmt-check test demo-test verify-generated render
+verify: generate manifests build vet lint fmt-check test demo-test verify-generated verify-docs render
 verify-generated: $(CONTROLLER_GEN)
 	bash hack/verify-generated.sh
+verify-docs:
+	bash test/docs/verify-portfolio.sh
 render: $(KUSTOMIZE)
 	mkdir -p dist
 	$(KUSTOMIZE) build config/default > dist/install.yaml
@@ -104,8 +107,26 @@ smoke: render
 	bash test/e2e/bootstrap-smoke.sh "$(IMG)"
 e2e: render docker-build demo-test demo-build
 	bash test/e2e/lifecycle-e2e.sh "$(IMG)" "$(DEMO_IMG_V1)" "$(DEMO_IMG_V2)"
+portfolio-demo:
+	bash demo/portfolio-demo.sh
+kind:
+	@test -x .tools/bin/kind || bash hack/bootstrap-tools.sh kind
 kubectl:
 	@test -x .tools/bin/kubectl || bash hack/bootstrap-tools.sh kubectl
+kind-up: kind
+	.tools/bin/kind create cluster --name "$(KIND_CLUSTER)" --image "$$(jq -r '.kubernetes.kindNodeImage' toolchain.lock.json)" --wait 120s
+kind-load: kind
+	docker image inspect "$(IMG)" "$(DEMO_IMG_V1)" "$(DEMO_IMG_V2)" >/dev/null
+	.tools/bin/kind load docker-image "$(IMG)" "$(DEMO_IMG_V1)" "$(DEMO_IMG_V2)" --name "$(KIND_CLUSTER)"
+kind-down: kind
+	.tools/bin/kind delete cluster --name "$(KIND_CLUSTER)"
+quickstart: kind-up
+	$(MAKE) IMG=awcp-manager:quickstart docker-build
+	$(MAKE) demo-build
+	$(MAKE) IMG=awcp-manager:quickstart kind-load
+	$(MAKE) DEPLOY_IMG=awcp-manager:quickstart deploy
+	.tools/bin/kubectl apply -f examples/basic.yaml
+	.tools/bin/kubectl -n awcp-workloads wait --for=condition=Ready aiworkload/basic-demo --timeout=180s
 install: kubectl
 	.tools/bin/kubectl apply -k config/install
 deploy: kubectl

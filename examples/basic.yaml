@@ -1,0 +1,21 @@
+# Runnable only after `make quickstart` or loading awcp-demo:v1 into your cluster.
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: basic-demo
+  namespace: awcp-workloads
+spec:
+  image: awcp-demo:v1
+  replicas: 1
+  container:
+    port: 8080
+  health:
+    readiness:
+      path: /ready
+    liveness:
+      path: /health
+  service:
+    enabled: true
+    port: 80
+  network:
+    enabled: false
