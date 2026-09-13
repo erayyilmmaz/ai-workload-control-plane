@@ -1,7 +1,8 @@
 # AIWorkload API and status contract
 
-Types, structural schema, defaults and admission tests implemented in AWCP-4.
-Lifecycle/status production remains accepted design from AWCP-2, implemented in later stories.
+Types, structural schema, defaults and admission tests were implemented in AWCP-4.
+AWCP-7 implements the Service endpoint portion of the status contract; full lifecycle
+and readiness status remain later work.
 
 ## API identity
 
@@ -84,7 +85,9 @@ is round-tripped via `/status` by tests; it is not a real readiness report.
 Writes to `/status` cannot modify spec or advance generation. Main-resource creation
 discards supplied status, and ordinary spec updates preserve existing status and
 advance generation for spec changes. These are real API-server tests, with no AWCP
-controller running. The controller still has no status write permission in this step.
+controller running. The controller has status permission and AWCP-7 writes `endpoint`
+only after a successful enabled Service apply (or clears it when Service is disabled).
+The full condition/readiness reducer remains AWCP-10.
 
 | Evaluated state | Ready | Progressing | Degraded | Primary reason |
 | --- | --- | --- | --- | --- |

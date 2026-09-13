@@ -32,13 +32,13 @@ func intentFor(t *testing.T, p *platform.AIWorkload) Intent {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan) != 1 {
-		t.Fatal("AWCP-6 emits only Deployment")
+	for _, intent := range plan {
+		if _, ok := intent.Object.(*appsv1.Deployment); ok {
+			return intent
+		}
 	}
-	if _, ok := plan[0].Object.(*appsv1.Deployment); !ok {
-		t.Fatal("wrong child kind")
-	}
-	return plan[0]
+	t.Fatal("Deployment intent missing")
+	return Intent{}
 }
 func build(t *testing.T, p *platform.AIWorkload) *appsv1.Deployment {
 	t.Helper()

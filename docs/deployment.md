@@ -10,9 +10,10 @@ Deployment reconciler with a different safety policy.
 The dedicated ServiceAccount **name is bound but its object is not created yet**
 (AWCP-8). Native ReplicaSet/Pod creation can therefore report `FailedCreate` until
 that identity exists. Secret names are mapped but metadata prerequisites/status
-arrive in AWCP-8. Service and NetworkPolicy creation are AWCP-7/9. Do not work around
-this staged implementation by switching to the default ServiceAccount or granting
-workload RBAC. AWCP-6 is not full application readiness or a production release.
+arrive in AWCP-8. AWCP-7 adds the optional cluster-local Service described in
+[service.md](service.md); NetworkPolicy arrives in AWCP-9. Do not work around this
+staged implementation by switching to the default ServiceAccount or granting
+workload RBAC. This is not full application readiness or a production release.
 
 ## Field ownership
 

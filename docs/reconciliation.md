@@ -16,9 +16,9 @@ Missing/deleting parent stops work. Writes are sequential, not atomic; a retry
 resumes from API state. No finalizer, database, force update or adoption is added.
 
 `manager.Options.Builder` is the internal composition point. If unset, the manager
-uses `WorkloadBuilder`, which emits the AWCP-6 Deployment intent. `test/fixtures.Plan`
-remains deliberately incomplete and only supports AWCP-5 engine tests. AWCP-7/8/9
-add the remaining production children; AWCP-10 observes readiness. An optional controller name
+uses `WorkloadBuilder`, which emits AWCP-6 Deployment and AWCP-7 optional Service
+intents. `test/fixtures.Plan` remains deliberately incomplete and only supports
+AWCP-5 engine tests. AWCP-8/9 add the remaining production children; AWCP-10 observes readiness. An optional controller name
 allows tests to restart managers sequentially without disabling the runtime's
 process-global name uniqueness validation; the shipped name stays `aiworkload`.
 
@@ -74,9 +74,11 @@ not every future production field mapping.
 Errors retain their cause through `Unwrap` without putting arbitrary API error
 bodies in log/status/Event text. Failure status records observed generation and
 desired replicas. Ready/Progressing are Unknown on transient failure and False
-on configuration/ownership failure; Degraded is True. Existing endpoint and
-readyReplicas are not newly observed here: consumers must check conditions and
-observedGeneration. The complete reducer is AWCP-10. Status patches use optimistic
+on configuration/ownership failure; Degraded is True. When a Service intent applies
+successfully, AWCP-7 publishes its deterministic in-cluster endpoint; disabling
+Service clears a stale endpoint even if a guarded delete reports a conflict.
+Endpoint and readyReplicas are otherwise not health observations: consumers must
+check conditions and observedGeneration. The complete reducer is AWCP-10. Status patches use optimistic
 locking and transition timestamps remain stable for unchanged condition status.
 
 If a status write is denied or conflicts, that error is returned for retry; a

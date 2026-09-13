@@ -82,12 +82,21 @@ var _ = Describe("Bootstrap with a real API and etcd", func() {
 		Eventually(func() error {
 			return mgr.GetCache().Get(ctx, key, &platformv1alpha1.AIWorkload{})
 		}, 10*time.Second).Should(Succeed())
-		workload.Status.Conditions = []metav1.Condition{{
-			Type: "BootstrapTest", Status: metav1.ConditionTrue, Reason: "TestFixture",
-			ObservedGeneration: workload.Generation,
-			Message:            "Synthetic schema round-trip only", LastTransitionTime: metav1.Now(),
-		}}
-		Expect(api.Status().Update(ctx, workload)).To(Succeed())
+		// AWCP-7 writes endpoint status after Service creation. Read-modify-write
+		// against the current resource and retry the ordinary optimistic conflict;
+		// this test's purpose is status isolation, not winning a concurrent update.
+		Eventually(func() error {
+			var current platformv1alpha1.AIWorkload
+			if err := api.Get(ctx, key, &current); err != nil {
+				return err
+			}
+			current.Status.Conditions = []metav1.Condition{{
+				Type: "BootstrapTest", Status: metav1.ConditionTrue, Reason: "TestFixture",
+				ObservedGeneration: current.Generation,
+				Message:            "Synthetic schema round-trip only", LastTransitionTime: metav1.Now(),
+			}}
+			return api.Status().Update(ctx, &current)
+		}, 10*time.Second).Should(Succeed())
 		Eventually(func(g Gomega) {
 			var cached platformv1alpha1.AIWorkload
 			g.Expect(mgr.GetCache().Get(ctx, key, &cached)).To(Succeed())

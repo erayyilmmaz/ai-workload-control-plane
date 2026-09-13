@@ -65,6 +65,11 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 		message = "The owned Deployment has an incompatible immutable selector; administrative resolution is required. Automatic deletion or replacement is disabled."
 		permanent = true
 	}
+	if errors.Is(cause, resource.ErrImmutableServiceAllocation) {
+		reason = "ResourceOwnershipConflict"
+		message = "The owned Service has an incompatible immutable cluster allocation; administrative resolution is required. Automatic deletion or replacement is disabled."
+		permanent = true
+	}
 	before := p.DeepCopy()
 	for _, typ := range []string{"Ready", "Progressing", "Degraded"} {
 		value := metav1.ConditionUnknown

@@ -169,9 +169,26 @@ func TestProductionDeployment(t *testing.T) {
 		if err := api.Get(ctx, keyFor(alpha), &corev1.ServiceAccount{}); !apierrors.IsNotFound(err) {
 			t.Fatalf("AWCP-6 must not create identity yet: %v", err)
 		}
-		if err := api.Get(ctx, keyFor(alpha), &corev1.Service{}); !apierrors.IsNotFound(err) {
-			t.Fatalf("AWCP-6 must not create Service yet: %v", err)
-		}
+		eventually(t, "AWCP-7 Service contract", func() error {
+			var service corev1.Service
+			if err := api.Get(ctx, keyFor(alpha), &service); err != nil {
+				return err
+			}
+			if service.Spec.Type != corev1.ServiceTypeClusterIP || !apiequality.Semantic.DeepEqual(service.Spec.Selector, resource.SelectorLabels(alpha)) || len(service.Spec.Ports) != 1 || service.Spec.Ports[0].Name != resource.HTTPPortName || service.Spec.Ports[0].Port != 80 || service.Spec.Ports[0].TargetPort != intstr.FromString(resource.HTTPPortName) {
+				return errors.New("Service managed fields have not converged")
+			}
+			return nil
+		})
+		eventually(t, "Service endpoint status", func() error {
+			var actual platform.AIWorkload
+			if err := api.Get(ctx, client.ObjectKeyFromObject(alpha), &actual); err != nil {
+				return err
+			}
+			if actual.Status.Endpoint != resource.ChildName(alpha.Name)+".workloads.svc:80" {
+				return errors.New("endpoint has not converged")
+			}
+			return nil
+		})
 	})
 	t.Run("intentional failure fixtures are valid CRs and preserve requested intent", func(t *testing.T) {
 		for _, fixture := range []struct {
@@ -226,6 +243,77 @@ func TestProductionDeployment(t *testing.T) {
 		if actual.ResourceVersion != current.ResourceVersion {
 			t.Fatal("unchanged reconcile wrote Deployment")
 		}
+	})
+	t.Run("Service port drift toggle and endpoint lifecycle", func(t *testing.T) {
+		var service corev1.Service
+		eventually(t, "initial Service allocation", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &service); err != nil {
+				return err
+			}
+			if service.Spec.ClusterIP == "" || service.Spec.ClusterIP == corev1.ClusterIPNone {
+				return errors.New("cluster IP not allocated")
+			}
+			return nil
+		})
+		allocatedIP := service.Spec.ClusterIP
+		service.Spec.Selector = map[string]string{"drift": "true"}
+		service.Spec.Ports = []corev1.ServicePort{{Name: "wrong", Protocol: corev1.ProtocolUDP, Port: 1234, TargetPort: intstr.FromInt(1234)}}
+		if err := api.Update(ctx, &service); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "Service drift repair", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &service); err != nil {
+				return err
+			}
+			if service.Spec.ClusterIP != allocatedIP || !apiequality.Semantic.DeepEqual(service.Spec.Selector, resource.SelectorLabels(alpha)) || len(service.Spec.Ports) != 1 || service.Spec.Ports[0].Port != 80 || service.Spec.Ports[0].TargetPort != intstr.FromString(resource.HTTPPortName) {
+				return errors.New("Service drift has not converged")
+			}
+			return nil
+		})
+		current = update(t, alpha, func(p *platform.AIWorkload) { p.Spec.Service = &platform.ServiceSpec{Port: ptr.To(int32(8081))} })
+		eventually(t, "Service port and endpoint update", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &service); err != nil {
+				return err
+			}
+			var workload platform.AIWorkload
+			if err := api.Get(ctx, client.ObjectKeyFromObject(alpha), &workload); err != nil {
+				return err
+			}
+			if service.Spec.ClusterIP != allocatedIP || len(service.Spec.Ports) != 1 || service.Spec.Ports[0].Port != 8081 || workload.Status.Endpoint != resource.ChildName(alpha.Name)+".workloads.svc:8081" {
+				return errors.New("Service update or endpoint has not converged")
+			}
+			return nil
+		})
+		current = update(t, alpha, func(p *platform.AIWorkload) { p.Spec.Service = &platform.ServiceSpec{Enabled: ptr.To(false)} })
+		eventually(t, "disabled Service is removed and endpoint cleared", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &corev1.Service{}); !apierrors.IsNotFound(err) {
+				return errors.New("disabled Service still exists")
+			}
+			var workload platform.AIWorkload
+			if err := api.Get(ctx, client.ObjectKeyFromObject(alpha), &workload); err != nil {
+				return err
+			}
+			if workload.Status.Endpoint != "" {
+				return errors.New("disabled Service left stale endpoint")
+			}
+			return nil
+		})
+		current = update(t, alpha, func(p *platform.AIWorkload) {
+			p.Spec.Service = &platform.ServiceSpec{Enabled: ptr.To(true), Port: ptr.To(int32(8082))}
+		})
+		eventually(t, "re-enabled Service and endpoint", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &service); err != nil {
+				return err
+			}
+			var workload platform.AIWorkload
+			if err := api.Get(ctx, client.ObjectKeyFromObject(alpha), &workload); err != nil {
+				return err
+			}
+			if len(service.Spec.Ports) != 1 || service.Spec.Ports[0].Port != 8082 || workload.Status.Endpoint != resource.ChildName(alpha.Name)+".workloads.svc:8082" {
+				return errors.New("re-enabled Service has not converged")
+			}
+			return nil
+		})
 	})
 	t.Run("replicas 1 to 2 to 0 does not change template", func(t *testing.T) {
 		template := current.Spec.Template.DeepCopy()
