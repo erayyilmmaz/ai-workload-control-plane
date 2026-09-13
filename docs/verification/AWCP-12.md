@@ -21,6 +21,8 @@ Date: 2026-09-13
 | `go test ./internal/controller` | Passed | Deletion guard, repeated reconciliation, user-Secret preservation, stale-owner and delete-race boundaries |
 | `make verify` | Passed | Full build/lint/unit/envtest/generated/render validation |
 | `make test-race` | Passed | Full race detector validation |
+| `make docker-build IMG=awcp-manager:awcp-12` | Passed | Linux ARM64 manager image built from `72b299d` |
+| `make smoke IMG=awcp-manager:awcp-12` | Passed | Fresh kind parent deletion; four children and ReplicaSet/Pod subtree GC, user Secret preserved and cleanup succeeded |
 
 ## Limits
 
