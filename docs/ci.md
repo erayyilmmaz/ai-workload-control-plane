@@ -68,6 +68,7 @@ make vuln
 make e2e
 ```
 
-Passing these commands is not hosted-CI evidence. The workflow has not yet been
-observed on GitHub, and Linux AMD64 E2E remains a separate result from local macOS
-ARM64 execution.
+Passing these commands is not hosted-CI evidence. The workflow was subsequently
+observed passing on GitHub-hosted Linux AMD64 for commit `a6dbc76`, including the
+kind E2E job; see [AWCP-16 execution evidence](verification/AWCP-16.md). This
+does not configure required checks or block merges.

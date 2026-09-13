@@ -2,7 +2,7 @@
 
 A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
 
-**Stage: CI quality gates and supply-chain hygiene (AWCP-16). Secrets-free GitHub Actions gates are defined; a hosted run and active branch ruleset remain separate evidence.**
+**Stage: CI quality gates and supply-chain hygiene (AWCP-16). Secrets-free GitHub Actions gates passed once on hosted Linux AMD64; active branch ruleset/merge blocking remains separate evidence.**
 
 An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
 
@@ -86,7 +86,8 @@ Secrets. AWCP-13 adds the consolidated unit/envtest regression suite and a
 project-scoped coverage artefact. AWCP-14 adds a disposable kind lifecycle suite:
 real workload traffic, v1-to-v2 rollout, scale, child drift, Secret recovery,
 manager restart and garbage collection. AWCP-15 adds canonical Kustomize packaging
-and safe removal. Hosted CI and published images/releases remain future work. See
+and safe removal. AWCP-16 adds hosted CI quality gates; published images/releases
+and active merge-blocking rules remain future work. See
 [AWCP-2 design evidence](docs/verification/AWCP-2.md) and
 [AWCP-3 execution evidence](docs/verification/AWCP-3.md) and
 [AWCP-4 contract evidence](docs/verification/AWCP-4.md) and

@@ -34,8 +34,18 @@ completed the package deploy/undeploy lifecycle, and deleted its isolated kind
 cluster. Local success is not hosted GitHub Actions, branch-protection, image
 publication or release evidence.
 
+The [GitHub-hosted Linux AMD64 workflow](https://github.com/erayyilmmaz/ai-workload-control-plane/actions/runs/34767862996)
+for commit `a6dbc76` then passed all 11 jobs: format, lint, vet, generate-check,
+manifest-check, unit-test, envtest, build, docker-build, supply-chain and e2e.
+The E2E job completed the disposable kind lifecycle in 3m46s. The preceding
+workflow run exposed a portability defect:
+the package and workflow guard scripts assumed `rg`, which is not on the hosted
+runner. Commit `a6dbc76` changes those assertions to POSIX-available `grep -E`;
+the successful run is the evidence for that remediation.
+
 ## Known boundaries
 
-No hosted workflow run, active GitHub ruleset, SBOM, image-signing/provenance,
-container vulnerability scan or Linux AMD64 execution is claimed until observed
-with its own artifact/run evidence.
+The GitHub-hosted Linux AMD64 workflow run is now observed. Repository rulesets
+were read on 2026-09-13 and none were active, so passing CI does not currently
+block merges. SBOM, image-signing/provenance, container vulnerability scan, image
+publication and release remain outside this story.
