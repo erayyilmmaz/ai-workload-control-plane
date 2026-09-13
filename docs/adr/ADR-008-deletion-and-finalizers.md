@@ -1,6 +1,6 @@
 # ADR-008 — Deletion and Finalizers
 
-Status: Accepted design. Date: 2026-09-12. Tracking: AWCP-2.
+Status: Implemented for V0. Date: 2026-09-13. Tracking: AWCP-12.
 
 ## Context
 
@@ -20,7 +20,12 @@ Manual deletion of each child duplicates native GC and adds partial-failure hand
 
 ## Validation and revisit trigger
 
-AWCP-12 verifies guards/ownership and races; AWCP-14 proves actual Deployment/ReplicaSet/Pod subtree garbage collection and Secret survival. Envtest has no garbage collector, so its test must assert ownerReferences, not imaginary cleanup.
+AWCP-12 verifies guards/ownership, repeated deletion behavior, user-Secret
+preservation and actual kind-based Deployment/ReplicaSet/Pod subtree garbage
+collection. Envtest has no garbage collector, so its tests assert ownerReferences
+and deletion guards rather than imaginary cleanup. Revisit this decision before
+adding an external resource, ordered teardown dependency or any other cleanup that
+Kubernetes ownerReferences cannot perform.
 
 ## References
 

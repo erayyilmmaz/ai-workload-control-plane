@@ -2,7 +2,7 @@
 
 A Go-based Kubernetes operator for the declarative lifecycle of containerized AI applications.
 
-**Stage: Controller observability (AWCP-11). The manager exposes authenticated HTTPS metrics, bounded operational signals, structured logs and optional dashboard/Collector examples.**
+**Stage: Deletion lifecycle (AWCP-12). Kubernetes garbage collection removes owned children; the controller adds no artificial finalizer and preserves user-owned Secrets.**
 
 An `AIWorkload` will describe a long-running, stateless HTTP application. The controller will reconcile its Deployment, optional ClusterIP Service, dedicated ServiceAccount and optional NetworkPolicy, then report observed status. The application inside the image supplies the AI behavior; the operator does not run models or agents itself.
 
@@ -71,8 +71,10 @@ egress isolation or prove CNI enforcement. AWCP-10 adds generation-aware
 Deployment readiness, replica observations, reasoned failure conditions and bounded
 Events; it does not prove application traffic, DNS or CNI enforcement. AWCP-11 adds
 bounded metrics and optional observability artifacts without making telemetry a
-reconciliation dependency. Application lifecycle E2E, hosted CI and releases
-remain future work. See [AWCP-2 design evidence](docs/verification/AWCP-2.md) and
+reconciliation dependency. AWCP-12 proves the no-finalizer deletion guard and
+kind-based garbage collection of the owned child tree while preserving user-owned
+Secrets. Application lifecycle E2E, hosted CI and releases remain future work. See
+[AWCP-2 design evidence](docs/verification/AWCP-2.md) and
 [AWCP-3 execution evidence](docs/verification/AWCP-3.md) and
 [AWCP-4 contract evidence](docs/verification/AWCP-4.md) and
 [AWCP-5 foundation evidence](docs/verification/AWCP-5.md).
@@ -81,9 +83,10 @@ remain future work. See [AWCP-2 design evidence](docs/verification/AWCP-2.md) an
 [AWCP-8 identity evidence](docs/verification/AWCP-8.md) and
 [AWCP-9 NetworkPolicy evidence](docs/verification/AWCP-9.md) and
 [AWCP-10 status evidence](docs/verification/AWCP-10.md) and
-[AWCP-11 telemetry evidence](docs/verification/AWCP-11.md).
+[AWCP-11 telemetry evidence](docs/verification/AWCP-11.md) and
+[AWCP-12 deletion evidence](docs/verification/AWCP-12.md).
 
-The next milestone is AWCP-12 — deletion, garbage collection and lifecycle edge cases.
+The next milestone is AWCP-13 — unit + envtest integration test suite.
 Each completed development step is validated, committed and pushed before moving on.
 
 The [original Jira backlog export](docs/backlog/awcp-v0.md) is a dated planning snapshot. Current architecture documents and the version lock supersede its provisional choices; corrections are listed in the compatibility document.

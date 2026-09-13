@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: awcp-manager:awcp-11
+          image: awcp-manager:awcp-12
           imagePullPolicy: IfNotPresent
           args:
             - --leader-elect=true

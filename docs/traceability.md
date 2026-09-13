@@ -48,7 +48,7 @@ activates generation-aware conditions, readiness and bounded Events.
 | 08 / AWC-8 | AWCP-9 | Ingress-only policy generation and toggles | Unit/envtest; CNI enforcement only with separate profile | AWCP-6 |
 | 09 / AWC-9 | AWCP-10 | Status, generation gates, reason/event model | Truth-table unit + no-op/status envtest | AWCP-6, 7, 8, 9 |
 | 10 / AWC-10 | AWCP-11 | Metrics, structured logs, dashboard, Collector example | Counter/gauge/outage checks and dashboard demo | AWCP-5, 10 |
-| 11 / AWC-11 | AWCP-12 | Delete guards and ownership lifecycle | Unit/envtest guards; real GC later | AWCP-6, 7, 8, 9, 10 |
+| 11 / AWC-11 | AWCP-12 | Delete guards and ownership lifecycle | Guard/race unit tests; kind GC and Secret-survival smoke | AWCP-6, 7, 8, 9, 10 |
 | 12 / AWC-12 | AWCP-13 | Consolidated regression/coverage suite | Unit + real API envtest, race where supported | AWCP-6 through 12 |
 | 13 / AWC-13 | AWCP-14 | Isolated kind harness, demo image, diagnostics/cleanup | Real rollout, scale, drift, Secret recovery, service traffic, GC | AWCP-13 |
 | 14 / AWC-14 | AWCP-15 | Kustomize package, install/uninstall guide | Install/upgrade/undeploy + explicit cleanup checks | AWCP-14 |
@@ -70,7 +70,7 @@ Each behavior gets relevant tests while it is implemented. AWCP-13 consolidates 
 | Optional child disabled | Delete only current UID-owned child, clear stale endpoint | AWCP-7/9 |
 | API Conflict/Forbidden/timeout | Specific failure, bounded retry, other workloads progress | AWCP-5/10/13 |
 | Manager restart / telemetry outage | State rebuilt from API; reconcile independent of telemetry | AWCP-11/14 |
-| Parent deletion / same-name recreation | GC old subtree; never adopt/delete another UID; Secret preserved | AWCP-12/14 |
+| Parent deletion / same-name recreation | GC old subtree; never adopt/delete another UID; Secret preserved | AWCP-12 |
 | Default kind without enforcing CNI | Policy object evidence only | AWCP-9/14 documentation |
 | Operator undeploy vs CRD removal | Preserve workload by default; explicit destructive cleanup separate | AWCP-15/17 |
 

@@ -2,7 +2,7 @@
 # Manager/container plus identity/Deployment/Service/NetworkPolicy/status-contract smoke; traffic enforcement E2E requires a CNI profile.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-image="${1:-awcp-manager:awcp-11}"
+image="${1:-awcp-manager:awcp-12}"
 for tool in kind kubectl; do
   test -x ".tools/bin/$tool" || bash hack/bootstrap-tools.sh "$tool"
 done
@@ -65,6 +65,8 @@ done
 workload="bootstrap-sample"
 hash="$(printf '%s' "$workload" | shasum -a 256 | awk '{print substr($1, 1, 16)}')"
 child="awcp-$workload-$hash"
+preserved_secret="awcp-user-owned-preserved"
+"$kubectl" -n awcp-workloads create secret generic "$preserved_secret" --from-literal=marker=synthetic
 "$kubectl" -n awcp-workloads wait --for=create "deployment/$child" --timeout=30s
 "$kubectl" -n awcp-workloads wait --for=create "service/$child" --timeout=30s
 workload_uid="$("$kubectl" -n awcp-workloads get "aiworkload/$workload" -o jsonpath='{.metadata.uid}')"
@@ -108,6 +110,7 @@ while test "$i" -lt 30; do
 done
 test "${actual_endpoint:-}" = "$endpoint"
 "$kubectl" -n awcp-workloads get "aiworkload/$workload" -o json | jq -e '
+  .metadata.finalizers == null and
   .status.observedGeneration == .metadata.generation and
   .status.desiredReplicas == 1 and
   ([.status.conditions[]? | select(.type == "Ready" and .status == "False" and (.reason == "Reconciling" or .reason == "DeploymentUnavailable"))] | length == 1) and
@@ -143,5 +146,23 @@ for rule in 'get secrets' 'get pods' 'create pods'; do
 done
 answer="$("$kubectl" auth can-i get aiworkloads.platform.example.io -n default --as="$identity" || true)"
 test "$answer" = no
+"$kubectl" -n awcp-workloads delete "aiworkload/$workload" --wait=false
+for owned in "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child"; do
+  "$kubectl" -n awcp-workloads wait --for=delete "$owned" --timeout=60s
+done
+"$kubectl" -n awcp-workloads wait --for=delete "aiworkload/$workload" --timeout=60s
+for kind in replicasets pods; do
+  i=0
+  while test "$i" -lt 60; do
+    remaining="$("$kubectl" -n awcp-workloads get "$kind" -l "app.kubernetes.io/instance=$child" -o name 2>/dev/null || true)"
+    test -z "$remaining" && break
+    i=$((i + 1))
+    sleep 1
+  done
+  test -z "${remaining:-}"
+done
+"$kubectl" -n awcp-workloads get "secret/$preserved_secret" -o json | jq -e '
+  .metadata.ownerReferences == null and
+  .data.marker != null'
 "$kubectl" -n awcp-system logs deployment/awcp-controller-manager --tail=30
-echo 'PASS: manager security, health/readiness, metrics Service, Lease, identity/Deployment/Service/NetworkPolicy/status contracts, endpoint and least-privilege RBAC'
+echo 'PASS: manager security, health/readiness, metrics Service, Lease, identity/Deployment/Service/NetworkPolicy/status/deletion contracts, endpoint, garbage collection and least-privilege RBAC'

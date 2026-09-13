@@ -345,6 +345,65 @@ func TestDeletionGuardAndPrimaryPredicate(t *testing.T) {
 	}
 }
 
+func TestDeletionGuardIsIdempotentAndPreservesUserSecret(t *testing.T) {
+	p, s, _ := setup(t)
+	p.Finalizers = []string{"external.example/hold"}
+	now := metav1.Now()
+	p.DeletionTimestamp = &now
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "user-owned", Namespace: p.Namespace},
+		Data:       map[string][]byte{"marker": []byte("synthetic")},
+	}
+	base := fake.NewClientBuilder().WithScheme(s).WithStatusSubresource(p).WithObjects(p, secret).Build()
+	writes, builds := 0, 0
+	write := func() error {
+		writes++
+		return errors.New("deleting parent must not write")
+	}
+	wrapped := interceptor.NewClient(base, interceptor.Funcs{
+		Create: func(context.Context, client.WithWatch, client.Object, ...client.CreateOption) error { return write() },
+		Update: func(context.Context, client.WithWatch, client.Object, ...client.UpdateOption) error { return write() },
+		Patch: func(context.Context, client.WithWatch, client.Object, client.Patch, ...client.PatchOption) error {
+			return write()
+		},
+		Delete: func(context.Context, client.WithWatch, client.Object, ...client.DeleteOption) error { return write() },
+		DeleteAllOf: func(context.Context, client.WithWatch, client.Object, ...client.DeleteAllOfOption) error {
+			return write()
+		},
+		SubResourceUpdate: func(context.Context, client.Client, string, client.Object, ...client.SubResourceUpdateOption) error {
+			return write()
+		},
+		SubResourcePatch: func(context.Context, client.Client, string, client.Object, client.Patch, ...client.SubResourcePatchOption) error {
+			return write()
+		},
+	})
+	r := AIWorkloadReconciler{
+		Client:         wrapped,
+		WatchNamespace: p.Namespace,
+		Scheme:         s,
+		Builder: resource.BuilderFunc(func(*platform.AIWorkload) ([]resource.Intent, error) {
+			builds++
+			return nil, nil
+		}),
+	}
+	req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(p)}
+	for range 2 {
+		if _, err := r.Reconcile(t.Context(), req); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if builds != 0 || writes != 0 {
+		t.Fatalf("deletion guard built=%d writes=%d", builds, writes)
+	}
+	var preserved corev1.Secret
+	if err := base.Get(t.Context(), client.ObjectKeyFromObject(secret), &preserved); err != nil {
+		t.Fatal(err)
+	}
+	if string(preserved.Data["marker"]) != "synthetic" || len(preserved.OwnerReferences) != 0 {
+		t.Fatal("user Secret was modified or adopted")
+	}
+}
+
 func TestSecretIndexMapping(t *testing.T) {
 	p, s, _ := setup(t)
 	p.Spec.SecretRefs = []platform.SecretReference{"shared", "shared", ""}
