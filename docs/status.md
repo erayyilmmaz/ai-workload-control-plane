@@ -39,5 +39,9 @@ reconcile. Failure conditions emit one Warning Event only when their semantic st
 changes. Event, status and log messages use fixed generic text; Secret names, Secret
 data and arbitrary API error bodies are excluded.
 
+The controller owns only these three condition types. If a status conflict is retried
+against a fresh object, unrelated condition types are preserved; a newer primary
+generation is never overwritten by an old status observation.
+
 See the [API contract](api-contract.md), [reconciliation behavior](reconciliation.md)
 and [AWCP-10 execution evidence](verification/AWCP-10.md).

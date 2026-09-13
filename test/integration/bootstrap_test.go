@@ -12,6 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -100,8 +101,9 @@ var _ = Describe("Bootstrap with a real API and etcd", func() {
 		Eventually(func(g Gomega) {
 			var cached platformv1alpha1.AIWorkload
 			g.Expect(mgr.GetCache().Get(ctx, key, &cached)).To(Succeed())
-			g.Expect(cached.Status.Conditions).To(HaveLen(1))
-			g.Expect(cached.Status.Conditions[0].Reason).To(Equal("TestFixture"))
+			fixture := meta.FindStatusCondition(cached.Status.Conditions, "BootstrapTest")
+			g.Expect(fixture).NotTo(BeNil())
+			g.Expect(fixture.Reason).To(Equal("TestFixture"))
 		}, 10*time.Second).Should(Succeed())
 		outside := &platformv1alpha1.AIWorkload{ObjectMeta: metav1.ObjectMeta{Name: "outside", Namespace: "outside"}}
 		outside.Spec = workload.Spec

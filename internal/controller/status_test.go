@@ -3,13 +3,16 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -140,5 +143,41 @@ func TestReconcileReportsDeploymentStatusWithoutEventSpam(t *testing.T) {
 	}
 	if statusWrites != 2 || len(recorder.Events) != 1 {
 		t.Fatalf("unchanged reconcile wrote status or spammed Events: status=%d events=%d", statusWrites, len(recorder.Events))
+	}
+}
+
+func TestPatchStatusRetriesOneSameGenerationConflict(t *testing.T) {
+	p, scheme, _ := setup(t)
+	base := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(p).WithObjects(p).Build()
+	patches := 0
+	wrapped := interceptor.NewClient(base, interceptor.Funcs{
+		SubResourcePatch: func(ctx context.Context, c client.Client, sub string, o client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+			patches++
+			if patches == 1 {
+				concurrent := &platform.AIWorkload{}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(o), concurrent); err != nil {
+					return err
+				}
+				concurrent.Status.Conditions = []metav1.Condition{{Type: "ExternalObservation", Status: metav1.ConditionTrue, Reason: "Fixture", Message: "must survive controller retry", ObservedGeneration: concurrent.Generation}}
+				if err := c.Status().Update(ctx, concurrent); err != nil {
+					return err
+				}
+				return apierrors.NewConflict(schema.GroupResource{Group: "platform.example.io", Resource: "aiworkloads"}, o.GetName(), errors.New("synthetic conflict"))
+			}
+			return c.SubResource(sub).Patch(ctx, o, patch, opts...)
+		},
+	})
+	current := &platform.AIWorkload{}
+	if err := base.Get(t.Context(), client.ObjectKeyFromObject(p), current); err != nil {
+		t.Fatal(err)
+	}
+	before := current.DeepCopy()
+	current.Status.DesiredReplicas = 1
+	changed, err := (&AIWorkloadReconciler{Client: wrapped}).patchStatus(t.Context(), before, current)
+	if err != nil || !changed || patches != 2 {
+		t.Fatalf("status conflict retry changed=%t patches=%d err=%v", changed, patches, err)
+	}
+	if err := base.Get(t.Context(), client.ObjectKeyFromObject(p), current); err != nil || current.Status.DesiredReplicas != 1 || meta.FindStatusCondition(current.Status.Conditions, "ExternalObservation") == nil {
+		t.Fatalf("retried status was not stored: status=%+v err=%v", current.Status, err)
 	}
 }

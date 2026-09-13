@@ -114,5 +114,38 @@ func (r *AIWorkloadReconciler) patchStatus(ctx context.Context, before, after *p
 		return false, nil
 	}
 	err := r.Status().Patch(ctx, after, client.MergeFromWithOptions(before, client.MergeFromWithOptimisticLock{}))
+	if err == nil || !apierrors.IsConflict(err) {
+		return err == nil, err
+	}
+	// Child status events can race this controller's own status patch. Retry once
+	// from a fresh primary object, but never apply an old generation's observation
+	// over a newer desired spec.
+	fresh := &platformv1alpha1.AIWorkload{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(after), fresh); err != nil {
+		return false, err
+	}
+	if fresh.Generation != after.Generation {
+		return false, err
+	}
+	freshBefore := fresh.DeepCopy()
+	fresh.Status = after.Status
+	fresh.Status.Conditions = preserveUnmanagedConditions(after.Status.Conditions, freshBefore.Status.Conditions)
+	if apiequality.Semantic.DeepEqual(freshBefore.Status, fresh.Status) {
+		return false, nil
+	}
+	err = r.Status().Patch(ctx, fresh, client.MergeFromWithOptions(freshBefore, client.MergeFromWithOptimisticLock{}))
 	return err == nil, err
+}
+
+func preserveUnmanagedConditions(desired, current []metav1.Condition) []metav1.Condition {
+	result := append([]metav1.Condition(nil), desired...)
+	for _, condition := range current {
+		if condition.Type == conditionReady || condition.Type == conditionProgressing || condition.Type == conditionDegraded {
+			continue
+		}
+		if meta.FindStatusCondition(result, condition.Type) == nil {
+			result = append(result, condition)
+		}
+	}
+	return result
 }
