@@ -32,9 +32,14 @@ Secret restore without a CR change, authenticated metrics, parent deletion and
 owned-child garbage collection while the user Secret survived. Its random temporary
 kind cluster was deleted after success.
 
-Hosted CI for this documentation/demo change, GitHub tag/release, registry image,
-merge ruleset and release artifacts are separate evidence states. No tag, release,
-registry image or ruleset is implied by this local record.
+The GitHub-hosted Linux AMD64 CI workflow for commit `7fce2e6` passed all eleven
+jobs on 2026-09-13: envtest, unit-test (including `make verify-docs`), supply-chain,
+vet, e2e, build, generate-check, format, lint, manifest-check and docker-build.
+The e2e job independently passed the full kind lifecycle harness.
+
+GitHub tag/release, registry image, merge ruleset and release artifacts remain
+separate evidence states. No tag, release, registry image or ruleset is implied by
+this local and CI record.
 
 ## Known boundaries
 
