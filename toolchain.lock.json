@@ -28,6 +28,7 @@
     },
     "kustomize": "v5.8.1",
     "golangciLint": "v2.12.2",
+    "govulncheck": "v1.8.0",
     "kind": "v0.33.0",
     "kubectl": "v1.36.4"
   },

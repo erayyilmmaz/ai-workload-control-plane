@@ -13,10 +13,12 @@ GO := .tools/go/bin/go
 CONTROLLER_TOOLS_VERSION := $(shell jq -r '.tools.controllerTools' toolchain.lock.json)
 KUSTOMIZE_VERSION := $(shell jq -r '.tools.kustomize' toolchain.lock.json)
 LINT_VERSION := $(shell jq -r '.tools.golangciLint' toolchain.lock.json)
+GOVULNCHECK_VERSION := $(shell jq -r '.tools.govulncheck' toolchain.lock.json)
 ENVTEST_REVISION := $(shell jq -r '.tools.setupEnvtest.revision' toolchain.lock.json)
 CONTROLLER_GEN := .tools/bin/controller-gen-$(CONTROLLER_TOOLS_VERSION)/controller-gen
 KUSTOMIZE := .tools/bin/kustomize-$(KUSTOMIZE_VERSION)/kustomize
 LINT := .tools/bin/golangci-lint-$(LINT_VERSION)/golangci-lint
+GOVULNCHECK := .tools/bin/govulncheck-$(GOVULNCHECK_VERSION)/govulncheck
 SETUP_ENVTEST := .tools/bin/setup-envtest-$(ENVTEST_REVISION)/setup-envtest
 IMG ?= awcp-manager:awcp-15
 VERSION ?= 0.1.0-dev
@@ -25,7 +27,7 @@ DEMO_IMG_V1 ?= awcp-demo:v1
 DEMO_IMG_V2 ?= awcp-demo:v2
 REVISION ?= $(shell git rev-parse HEAD)
 
-.PHONY: bootstrap tools check-go tidy generate manifests fmt build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated render docker-build demo-test demo-build smoke e2e kubectl install deploy undeploy release-bundle verify-package
+.PHONY: bootstrap tools check-go tidy generate manifests fmt fmt-check build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated render docker-build demo-test demo-build smoke e2e kubectl install deploy undeploy release-bundle verify-package vuln verify-ci
 bootstrap:
 	bash hack/bootstrap-tools.sh
 	$(MAKE) tools
@@ -49,6 +51,8 @@ $(KUSTOMIZE): toolchain.lock.json | check-go
 	GOBIN="$(CURDIR)/$(@D)" $(GO) install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
 $(LINT): toolchain.lock.json | check-go
 	GOBIN="$(CURDIR)/$(@D)" $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(LINT_VERSION)
+$(GOVULNCHECK): toolchain.lock.json | check-go
+	GOBIN="$(CURDIR)/$(@D)" $(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 $(SETUP_ENVTEST): toolchain.lock.json | check-go
 	GOBIN="$(CURDIR)/$(@D)" $(GO) install sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_REVISION)
 
@@ -64,6 +68,7 @@ vet: check-go
 	$(GO) vet ./...
 lint: $(LINT)
 	$(LINT) run ./...
+fmt-check: $(LINT)
 	$(LINT) fmt --diff
 lint-fix: $(LINT)
 	$(LINT) fmt
@@ -82,7 +87,7 @@ coverage: check-go envtest
 	mkdir -p dist
 	$(GO) test -count=1 -covermode=atomic -coverpkg="$$($(GO) list ./... | paste -sd, -)" -coverprofile=dist/coverage.out ./...
 	$(GO) tool cover -func=dist/coverage.out > dist/coverage.txt
-verify: generate manifests build vet lint test demo-test verify-generated render
+verify: generate manifests build vet lint fmt-check test demo-test verify-generated render
 verify-generated: $(CONTROLLER_GEN)
 	bash hack/verify-generated.sh
 render: $(KUSTOMIZE)
@@ -116,3 +121,7 @@ release-bundle: render
 	shasum -a 256 dist/release/awcp-crds.yaml dist/release/awcp-operator.yaml dist/release/awcp-operator-uninstall.yaml > dist/release/SHA256SUMS
 verify-package:
 	bash test/packaging/verify-bundle.sh
+vuln: $(GOVULNCHECK)
+	$(GOVULNCHECK) ./...
+verify-ci:
+	bash test/ci/verify-workflow.sh

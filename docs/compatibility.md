@@ -23,6 +23,7 @@ resolved modules and executable checks; exact outcomes are in
 | kubectl | v1.36.4 | Official release checksum endpoints verified for both host platforms |
 | Kustomize | v5.8.1 | Scaffold pin; tool's Go minimum is 1.24.0 |
 | golangci-lint | v2.12.2 | Scaffold pin; source's Go minimum is 1.25.0; build using selected Go 1.26.8 |
+| govulncheck | v1.8.0 | Independently pinned source-level vulnerability scanner used by CI; its database result remains time-dependent |
 | Ginkgo / Gomega | v2.28.0 / v1.39.1 | Selected scaffold test dependency versions |
 
 The v0.36.4 family is `k8s.io/api`, `apimachinery`, `client-go`, `apiextensions-apiserver`, `apiserver`, `component-base` and `streaming`. Do not assign that version to independent `k8s.io/*` modules. Their resolved pins remain klog/v2 v2.140.0, utils v0.0.0-20260210185600-b8788abfbbc2 and kube-openapi v0.0.0-20260317180543-43fb72c5454a. AWCP-3 resolved all seven family modules to v0.36.4 and verified the module checksums. `make tidy` preserves family pins even for lazy-loaded members not compiled by the bootstrap.

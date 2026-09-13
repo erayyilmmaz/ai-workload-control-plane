@@ -1,4 +1,4 @@
-# Local development — packaging stage
+# Local development — CI quality-gate stage
 
 This checkout contains a real, buildable workload operator. The manager reconciles one
 guarded Deployment, optional cluster-local Service, dedicated tokenless ServiceAccount
@@ -66,6 +66,8 @@ cached module archives, so **bootstrap itself is not an offline workflow**.
 | `make deploy DEPLOY_IMG=repo@sha256:...` | Apply the full package with an explicit accessible immutable manager image |
 | `make undeploy` | Remove only manager/RBAC/metrics; preserve CRDs, namespaces and workloads |
 | `make release-bundle` / `make verify-package` | Build and structurally verify portable YAML/checksum artifacts without a cluster |
+| `make fmt-check` / `make verify-ci` | Check formatting and local GitHub Actions security/gate structure without GitHub |
+| `make vuln` | Run pinned govulncheck; requires access to the Go vulnerability database |
 
 Use `make tidy` rather than plain `go mod tidy`: lazy loading can otherwise
 remove explicit patch pins for Kubernetes modules not yet compiled by this
@@ -184,6 +186,13 @@ outside this standard profile.
 See the [installation guide](installation.md) for canonical Kustomize deployment,
 upgrade/tagging, release bundle and safe-removal workflows. Do **not** delete the
 full bootstrap bundle as ordinary undeploy: it includes Namespaces and a CRD.
+
+## Hosted CI boundary
+
+The GitHub Actions definition and branch-protection steps are documented in
+[ci.md](ci.md). `make verify`, `make verify-ci`, `make vuln` and `make e2e` are
+local CI-equivalent checks; only a visible GitHub Actions run proves hosted CI, and
+only an active repository ruleset proves merge blocking.
 
 ## Generated versus owned source
 

@@ -1,0 +1,21 @@
+name: Bootstrap AWCP tools
+description: Restore safe local caches and install the project's pinned toolchain.
+runs:
+  using: composite
+  steps:
+    - name: Restore pinned tool and module caches
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: |
+          .tools/downloads
+          .tools/go
+          .tools/bin
+          .tools/envtest
+          .tools/gopath/pkg/mod
+          .tools/cache
+        key: awcp-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('toolchain.lock.json', 'go.sum') }}
+        restore-keys: |
+          awcp-${{ runner.os }}-${{ runner.arch }}-
+    - name: Verify and install pinned tools
+      shell: bash
+      run: make bootstrap
