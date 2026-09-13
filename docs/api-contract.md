@@ -33,9 +33,9 @@ as map keys, so unsupported resources are rejected rather than silently pruned.
 
 This is not complete Pod admission validation: CPU precision, LimitRange defaults,
 ResourceQuota and cluster policies remain child-API concerns. When child creation
-is implemented, its validation rejection must become `InvalidConfiguration` rather
-than a retry storm. AWCP-4 creates no children and does not claim that later error
-mapping is implemented. Missing resource keys remain absent in the CR; no fabricated
+is implemented, its validation rejection becomes `InvalidConfiguration` rather
+than a retry storm. AWCP-6 maps these quantities into the Deployment without
+writing defaults into the CR. Missing resource keys remain absent in the CR; no fabricated
 requests or limits are inserted. Collection/string bounds constrain CEL validation
 cost as well as API payload size.
 

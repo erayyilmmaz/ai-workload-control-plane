@@ -31,7 +31,7 @@ type Options struct {
 	LeaderElection   bool
 	// ControllerName defaults to aiworkload; tests use unique names for sequential managers.
 	ControllerName string
-	// Builder is an internal composition point; nil until production mappings land.
+	// Builder overrides the production plan in tests; nil uses WorkloadBuilder.
 	Builder resource.Builder
 }
 
@@ -52,6 +52,9 @@ func (o Options) Validate() error {
 func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 	if err := options.Validate(); err != nil {
 		return nil, err
+	}
+	if options.Builder == nil {
+		options.Builder = resource.WorkloadBuilder{}
 	}
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {

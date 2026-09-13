@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Manager/container smoke only; workload lifecycle E2E belongs to AWCP-14.
+# Manager/container and Deployment-contract smoke; complete workload lifecycle E2E belongs to AWCP-14.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-image="${1:-awcp-manager:awcp-3}"
+image="${1:-awcp-manager:awcp-6}"
 for tool in kind kubectl; do
   test -x ".tools/bin/$tool" || bash hack/bootstrap-tools.sh "$tool"
 done
@@ -62,6 +62,31 @@ for endpoint in healthz readyz; do
 done
 "$kubectl" -n awcp-system get lease awcp-controller.platform.example.io -o json | jq -e '.spec.holderIdentity | length > 0'
 "$kubectl" apply -f config/samples/platform_v1alpha1_aiworkload.yaml
+workload="bootstrap-sample"
+hash="$(printf '%s' "$workload" | shasum -a 256 | awk '{print substr($1, 1, 16)}')"
+child="awcp-$workload-$hash"
+"$kubectl" -n awcp-workloads wait --for=create "deployment/$child" --timeout=30s
+workload_uid="$("$kubectl" -n awcp-workloads get "aiworkload/$workload" -o jsonpath='{.metadata.uid}')"
+"$kubectl" -n awcp-workloads get "deployment/$child" -o json | jq -e --arg child "$child" --arg uid "$workload_uid" '
+  .metadata.ownerReferences == [{apiVersion:"platform.example.io/v1alpha1", kind:"AIWorkload", name:"bootstrap-sample", uid:$uid, controller:true, blockOwnerDeletion:false}] and
+  .spec.replicas == 1 and
+  .spec.selector.matchLabels == {"app.kubernetes.io/instance":$child, "platform.example.io/workload-uid":$uid} and
+  .spec.template.metadata.labels == (.spec.template.metadata.labels | . + {"app.kubernetes.io/instance":$child, "platform.example.io/workload-uid":$uid}) and
+  .spec.template.spec.serviceAccountName == $child and
+  .spec.template.spec.automountServiceAccountToken == false and
+  ([.spec.template.spec.containers[] | select(.name == "workload")] | length == 1) and
+  ([.spec.template.spec.containers[] | select(.name == "workload")][0] |
+    .image == "ghcr.io/example/demo-agent:v1" and .imagePullPolicy == "IfNotPresent" and
+    .ports == [{name:"http", containerPort:8080, protocol:"TCP"}] and
+    .securityContext.runAsNonRoot == true and
+    .securityContext.allowPrivilegeEscalation == false and
+    .securityContext.capabilities.drop == ["ALL"] and
+    .securityContext.seccompProfile.type == "RuntimeDefault")'
+# AWCP-8 deliberately creates this identity; AWCP-6 only binds its future name.
+if "$kubectl" -n awcp-workloads get "serviceaccount/$child" >/dev/null 2>&1; then
+  echo 'AWCP-6 must not create the dedicated ServiceAccount before AWCP-8' >&2
+  exit 1
+fi
 identity=system:serviceaccount:awcp-system:awcp-controller-manager
 test "$("$kubectl" auth can-i get aiworkloads.platform.example.io -n awcp-workloads --as="$identity")" = yes
 for rule in 'get secrets' 'create deployments.apps' 'create events.events.k8s.io'; do
@@ -77,4 +102,4 @@ done
 answer="$("$kubectl" auth can-i get aiworkloads.platform.example.io -n default --as="$identity" || true)"
 test "$answer" = no
 "$kubectl" -n awcp-system logs deployment/awcp-controller-manager --tail=30
-echo 'PASS: container UID, restricted security, health/readiness, Lease and foundation RBAC'
+echo 'PASS: manager security, health/readiness, Lease, Deployment contract and foundation RBAC'

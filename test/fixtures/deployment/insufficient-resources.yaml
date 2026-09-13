@@ -1,0 +1,18 @@
+# Intentional scheduler failure fixture for small disposable test clusters.
+# Dedicated ServiceAccount is an AWCP-8 prerequisite. Do not apply to shared clusters.
+# The image is a placeholder; replace it with the later non-root demo image before
+# a real lifecycle test. Unschedulable is expected before an image pull is attempted.
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: insufficient-resources
+  namespace: awcp-workloads
+spec:
+  image: example.invalid/awcp/demo:v1
+  replicas: 1
+  container:
+    port: 8080
+  resources:
+    requests:
+      cpu: "1000000"
+      memory: "1Pi"

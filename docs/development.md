@@ -1,11 +1,12 @@
-# Local development — reconciliation foundation stage
+# Local development — Deployment lifecycle stage
 
 This checkout contains a real, buildable Kubebuilder scaffold. It is **not yet a
-workload operator**: API validation and the reconciliation engine work, but the
-shipped manager has no production builder yet. Samples produce no children or
-workload status. Tests inject a minimal four-kind plan to prove ownership, no-op,
-drift, watches and restart. Never use contract samples as an application deployment.
-AWCP-6 begins production field mappings.
+workload operator**: the manager now reconciles one guarded Deployment, but it
+does not yet create its dedicated ServiceAccount, Service or NetworkPolicy, nor
+does it publish complete workload readiness. Samples therefore create a Deployment
+that can remain at `FailedCreate` until AWCP-8 provides its identity. Tests cover
+the Deployment contract, ownership, no-op, drift and restart; never use the
+placeholder samples as an application deployment.
 
 ## Prerequisites and first setup
 
@@ -107,13 +108,20 @@ failure rather than retrying a failed shutdown away.
 - AWCP-5 reconciliation envtest: real server defaults, Service IP and injected
   sidecar preservation, four-kind drift/delete watches, status/Secret events,
   stable resourceVersions, failure isolation, Events and manager restart.
+- AWCP-6 resource tests: deterministic Deployment mapping, fixed selector,
+  resource/probe/Secret/security mapping, scale-vs-template semantics, immutable
+  selector guard, input/output isolation and quantity validation.
+- AWCP-6 production envtest: default manager composition, create/patch/no-op,
+  real API defaults, metadata/sidecar preservation, immutable conflict condition,
+  deleted Deployment recovery and unrelated-parent isolation.
 - Kind smoke: image UID 65532, restricted runtime security, real health/readiness,
-  manager rollout, leadership and positive/negative foundation authorization.
+  manager rollout, leadership, created Deployment contract and positive/negative
+  foundation authorization. It intentionally does not wait for application Pods.
 
 Envtest uses an administrator test client; it does not prove runtime RBAC.
-Kind smoke checks the foundation Role with the shipped manager (nil builder),
-not the test-only plans. Neither layer proves application rollout, garbage
-collection, complete Secret dependency recovery, NetworkPolicy enforcement,
+Kind smoke checks the foundation Role with the shipped Deployment builder, not
+the old test-only four-kind plan. Neither layer proves application rollout,
+garbage collection, complete Secret dependency recovery, NetworkPolicy enforcement,
 multi-replica leader failover or telemetry. Those belong to later stories.
 
 ## Container and isolated smoke
@@ -130,7 +138,7 @@ escalation, uses RuntimeDefault seccomp and a read-only root filesystem; the
 manager needs no writable mount. Its ServiceAccount token remains mounted because
 it must contact Kubernetes. Future workload identities are a separate boundary.
 
-`IMG` defaults to `awcp-manager:awcp-3`; override it consistently for build/smoke.
+`IMG` defaults to `awcp-manager:awcp-6`; override it consistently for build/smoke.
 `REVISION` defaults to the current Git HEAD; before a source commit it identifies
 the parent, not the uncommitted source. Rebuild with the committed revision when
 producing an attributable image. The local image is not a published release.

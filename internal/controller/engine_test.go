@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
@@ -241,6 +242,8 @@ func TestFailureClassificationConditionsAndRecovery(t *testing.T) {
 		{"Forbidden", apierrors.NewForbidden(gr, "child", private), false}, {"Timeout", apierrors.NewTimeoutError(private.Error(), 1), false},
 		{"Throttled", apierrors.NewTooManyRequests(private.Error(), 1), false}, {"UnexpectedError", private, false},
 		{"ResourceOwnershipConflict", ErrOwnershipConflict, true}, {"InvalidConfiguration", ErrInvalidPlan, true},
+		{"ImmutableSelector", resource.ErrImmutableSelector, true},
+		{"APIInvalid", apierrors.NewInvalid(schema.GroupKind{Group: "apps", Kind: "Deployment"}, "child", field.ErrorList{field.Invalid(field.NewPath("spec"), "synthetic-invalid", private.Error())}), true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

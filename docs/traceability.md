@@ -29,8 +29,9 @@ AWCP-3's repository foundation is now implemented; see its
 [development guide](development.md).
 [AWCP-4](verification/AWCP-4.md) now implements the API schema and contract tests;
 [AWCP-5](verification/AWCP-5.md) implements the reconciliation/ownership engine and
-watch wiring with injected test builders. Production mappings and full observed
-readiness remain AWCP-6 onward; the default manager creates no children yet.
+watch wiring. [AWCP-6](verification/AWCP-6.md) activates the production Deployment
+mapping. Service/NetworkPolicy, dedicated ServiceAccount creation, dependency
+checks and full observed readiness remain later milestones.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |

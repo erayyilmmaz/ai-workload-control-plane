@@ -1,0 +1,14 @@
+# Intentional failure fixture, NOT a deployable demo image.
+# A dedicated ServiceAccount must exist first (implemented by AWCP-8).
+# With that prerequisite, kubelet should report ErrImagePull/ImagePullBackOff;
+# envtest can only verify that the requested image is preserved in the Deployment.
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: missing-image
+  namespace: awcp-workloads
+spec:
+  image: example.invalid/awcp/does-not-exist:v1
+  replicas: 1
+  container:
+    port: 8080

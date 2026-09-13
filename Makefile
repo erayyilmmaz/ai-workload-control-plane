@@ -18,7 +18,7 @@ CONTROLLER_GEN := .tools/bin/controller-gen-$(CONTROLLER_TOOLS_VERSION)/controll
 KUSTOMIZE := .tools/bin/kustomize-$(KUSTOMIZE_VERSION)/kustomize
 LINT := .tools/bin/golangci-lint-$(LINT_VERSION)/golangci-lint
 SETUP_ENVTEST := .tools/bin/setup-envtest-$(ENVTEST_REVISION)/setup-envtest
-IMG ?= awcp-manager:awcp-3
+IMG ?= awcp-manager:awcp-6
 REVISION ?= $(shell git rev-parse HEAD)
 
 .PHONY: bootstrap tools check-go tidy generate manifests fmt build vet lint lint-fix test test-unit test-envtest test-race envtest verify verify-generated render docker-build smoke

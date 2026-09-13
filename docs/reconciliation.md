@@ -15,10 +15,10 @@ finalizer. Order is ServiceAccount → Deployment → Service → NetworkPolicy.
 Missing/deleting parent stops work. Writes are sequential, not atomic; a retry
 resumes from API state. No finalizer, database, force update or adoption is added.
 
-`manager.Options.Builder` is the internal composition point. The shipped command
-does not set it yet. `test/fixtures.Plan` is deliberately incomplete: no production
-probe/resource/security/Secret behavior should be inferred from it. AWCP-6/7/8/9
-supply those mappings; AWCP-10 observes readiness. An optional controller name
+`manager.Options.Builder` is the internal composition point. If unset, the manager
+uses `WorkloadBuilder`, which emits the AWCP-6 Deployment intent. `test/fixtures.Plan`
+remains deliberately incomplete and only supports AWCP-5 engine tests. AWCP-7/8/9
+add the remaining production children; AWCP-10 observes readiness. An optional controller name
 allows tests to restart managers sequentially without disabling the runtime's
 process-global name uniqueness validation; the shipped name stays `aiworkload`.
 
@@ -64,7 +64,7 @@ not every future production field mapping.
 
 | Situation | Result and observable behavior |
 | --- | --- |
-| Missing/deleting parent, nil builder, successful apply/no-op | Empty result; no periodic success polling |
+| Missing/deleting parent or successful apply/no-op | Empty result; no periodic success polling |
 | Owned child terminating | Normal two-second recheck; no destructive recreation |
 | Conflict / AlreadyExists / Forbidden / timeout / throttling / unexpected error | Sanitized distinct error category; controller-runtime per-key retry/backoff |
 | Invalid plan/API Invalid or foreign ownership | Failure conditions and Warning Event; normal 60-second retry plus watch events |

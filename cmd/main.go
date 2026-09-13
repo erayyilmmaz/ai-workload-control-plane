@@ -37,7 +37,7 @@ func main() {
 		log.Error(err, "Could not create manager")
 		os.Exit(1)
 	}
-	log.Info("Starting bootstrap manager", "namespace", options.WatchNamespace)
+	log.Info("Starting AWCP manager", "namespace", options.WatchNamespace)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		log.Error(err, "Manager stopped with error")
 		os.Exit(1)

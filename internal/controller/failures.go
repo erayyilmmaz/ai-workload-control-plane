@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	platformv1alpha1 "github.com/erayyilmmaz/ai-workload-control-plane/api/v1alpha1"
+	"github.com/erayyilmmaz/ai-workload-control-plane/internal/resource"
 )
 
 // safeRetry preserves errors.Is/As while avoiding arbitrary API error bodies in logs.
@@ -57,6 +58,11 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 	if errors.Is(cause, ErrInvalidPlan) || apierrors.IsInvalid(cause) {
 		reason = "InvalidConfiguration"
 		message = "Desired resource configuration is invalid; review the specification and builder contract."
+		permanent = true
+	}
+	if errors.Is(cause, resource.ErrImmutableSelector) {
+		reason = "ResourceOwnershipConflict"
+		message = "The owned Deployment has an incompatible immutable selector; administrative resolution is required. Automatic deletion or replacement is disabled."
 		permanent = true
 	}
 	before := p.DeepCopy()

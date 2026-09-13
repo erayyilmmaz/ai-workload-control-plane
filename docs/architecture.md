@@ -1,11 +1,11 @@
 # Architecture and ownership contract
 
-Status: accepted design, AWCP-2, 2026-09-12. AWCP-5 now implements the shared engine,
-ownership guard, watch/index wiring and bounded failure reporting; see
-[reconciliation foundation](reconciliation.md). The resource-specific production
-mappings, Secret prerequisites and complete observed status below remain later
-milestones. The default manager has no builder yet; four-kind tests use test-only
-plans. This document remains the target contract, not a claim of full implementation.
+Status: accepted design, AWCP-2, 2026-09-12. AWCP-5 implements the shared engine,
+ownership guard, watch/index wiring and bounded failure reporting; AWCP-6 implements
+the Deployment mapping in [deployment lifecycle](deployment.md). Service/NetworkPolicy,
+dedicated ServiceAccount creation, Secret prerequisites and complete observed status
+remain later milestones. This document remains the target contract, not a claim of
+full implementation.
 
 ## Control plane boundary
 

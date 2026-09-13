@@ -23,7 +23,7 @@ import (
 
 var (
 	ErrOwnershipConflict = errors.New("ResourceOwnershipConflict")
-	ErrInvalidPlan       = errors.New("InvalidConfiguration")
+	ErrInvalidPlan       = resource.ErrInvalidConfiguration
 	ErrChildDeleting     = errors.New("owned child is still deleting")
 )
 

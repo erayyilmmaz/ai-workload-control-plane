@@ -1,4 +1,5 @@
-# Valid API fixture only. Controller does not deploy applications yet.
+# Valid AWCP-6 Deployment fixture only. It uses a placeholder image and its
+# dedicated ServiceAccount is created in AWCP-8, so it is not a runnable demo.
 apiVersion: platform.example.io/v1alpha1
 kind: AIWorkload
 metadata:
