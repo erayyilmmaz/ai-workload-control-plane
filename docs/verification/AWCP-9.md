@@ -22,6 +22,8 @@ Date: 2026-09-13
 | `KUBEBUILDER_ASSETS=... go test -count=1 -v ./test/reconciliation` | Passed | Real API create, drift repair, disable/delete, re-enable and unrelated policy preservation |
 | `make verify` | Passed | Full build/lint/unit/envtest/generated/render validation |
 | `make test-race` | Passed | Full race detector validation |
+| `DOCKER_CONFIG=... DOCKER_HOST=... make docker-build IMG=awcp-manager:awcp-9` | Passed | Local Linux ARM64 manager image for commit `244a64b` |
+| `DOCKER_CONFIG=... DOCKER_HOST=... make smoke IMG=awcp-manager:awcp-9` | Passed | Fresh kind bootstrap: manager startup, identity, Deployment, Service and NetworkPolicy API contracts |
 
 `TestProductionDeployment/NetworkPolicy_drift_toggle_and_unrelated_policy_lifecycle`
 uses a real API server and validates API object lifecycle, not CNI dataplane behavior.
