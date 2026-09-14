@@ -171,6 +171,19 @@ func TestAPIContract(t *testing.T) {
 			create(t, x)
 		}
 	})
+	t.Run("v0-compatible-manifest-remains-valid", func(t *testing.T) {
+		o := fixture(t, "test/fixtures/v1/v0-compatible.yaml")
+		create(t, o)
+		get(t, o)
+		expect(t, o, "example.invalid/v0-compatible:v1", "spec", "image")
+		expect(t, o, int64(2), "spec", "replicas")
+		expect(t, o, int64(8080), "spec", "service", "port")
+		for _, futureField := range []string{"environment", "tenant", "autoscaling", "exposure", "delivery", "externalSecrets", "availability", "policy"} {
+			if _, found, err := unstructured.NestedFieldNoCopy(o.Object, "spec", futureField); err != nil || found {
+				t.Fatalf("V0 fixture unexpectedly has V1 field %q: found=%v err=%v", futureField, found, err)
+			}
+		}
+	})
 	t.Run("invalid-fixtures", func(t *testing.T) {
 		data, err := os.ReadFile("../fixtures/invalid/index.json")
 		if err != nil {

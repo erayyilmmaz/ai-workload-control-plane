@@ -3,8 +3,9 @@
 A Go-based Kubernetes operator that turns one namespaced `AIWorkload` desired-state
 resource into a managed HTTP workload lifecycle.
 
-**Stage: V0 release preparation (AWCP-17).** The local demo and hosted CI are
-validated; no Git tag, GitHub Release or production image has been published.
+**Stage: V1 compatibility baseline (AWCP-19).** V0 local-demo and hosted-CI
+evidence remains valid; V1 begins with an additive API contract and has not
+published a Git tag, GitHub Release or production image.
 
 ## Problem
 
@@ -196,11 +197,15 @@ deletion.
 
 ## Roadmap
 
-V0 implementation is complete pending human release authorization. The next
-authorized work should be a release decision: activate merge rules if desired,
-select a tested immutable manager image, run the release checklist, then create a
+V0 implementation is complete pending human release authorization. AWCP-19 starts
+the separate V1 compatibility baseline: existing `v1alpha1` manifests remain the
+runtime contract while optional additive features are designed and delivered by
+their owning stories. See the [V1 API evolution contract](docs/v1-api-evolution.md).
+
+A V0 release still needs a human decision: activate merge rules if desired, select
+a tested immutable manager image, run the release checklist, then create a
 tag/release only with the resulting digest and evidence. Future platform hardening
-(CNI enforcement, GitOps, cloud deployment, multi-tenancy) is out of V0 scope.
+(CNI enforcement, GitOps, cloud deployment, multi-tenancy) remains outside V0.
 
 ## Further reading
 

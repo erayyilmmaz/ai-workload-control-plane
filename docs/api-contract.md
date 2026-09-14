@@ -1,5 +1,9 @@
 # AIWorkload API and status contract
 
+The V0 `v1alpha1` surface in this document is frozen for V1 compatibility. See
+[the AWCP-19 API evolution contract](v1-api-evolution.md) before adding a field,
+changing a default or deciding a new served version.
+
 Types, structural schema, defaults and admission tests were implemented in AWCP-4.
 AWCP-7 implements the Service endpoint portion; AWCP-8 implements missing-Secret
 prerequisites; AWCP-10 implements the generation-aware Deployment status reducer.

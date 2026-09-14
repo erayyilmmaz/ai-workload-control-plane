@@ -3,8 +3,10 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,13 +17,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	platformv1alpha1 "github.com/erayyilmmaz/ai-workload-control-plane/api/v1alpha1"
+	"github.com/erayyilmmaz/ai-workload-control-plane/internal/capability"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/manager"
 )
 
@@ -36,8 +41,11 @@ func TestBootstrapIntegration(t *testing.T) {
 	RunSpecs(t, "Bootstrap envtest suite")
 }
 
+var bootstrapManagerSequence atomic.Int64
+
 var _ = Describe("Bootstrap with a real API and etcd", func() {
 	var api client.Client
+	var cfg *rest.Config
 	var mgr ctrl.Manager
 	var ctx context.Context
 
@@ -47,7 +55,8 @@ var _ = Describe("Bootstrap with a real API and etcd", func() {
 			CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 			ErrorIfCRDPathMissing: true,
 		}
-		cfg, err := environment.Start()
+		var err error
+		cfg, err = environment.Start()
 		Expect(err).NotTo(HaveOccurred())
 		// Stop exactly once; retrying Stop can hide teardown failures.
 		DeferCleanup(func() { Expect(environment.Stop()).To(Succeed()) })
@@ -63,6 +72,8 @@ var _ = Describe("Bootstrap with a real API and etcd", func() {
 		}
 		mgr, err = manager.New(cfg, manager.Options{
 			WatchNamespace: "awcp-workloads", ManagerNamespace: "awcp-system", ProbeAddress: "0", LeaderElection: true,
+			// controller-runtime validates names process-wide; each envtest spec starts a new manager.
+			ControllerName: fmt.Sprintf("bootstrap-%d", bootstrapManagerSequence.Add(1)),
 		})
 		Expect(err).NotTo(HaveOccurred())
 		done := make(chan error, 1)
@@ -72,6 +83,26 @@ var _ = Describe("Bootstrap with a real API and etcd", func() {
 			Eventually(done, 15*time.Second).Should(Receive(BeNil()))
 		})
 		Eventually(mgr.Elected(), 20*time.Second).Should(BeClosed())
+	})
+
+	It("starts when optional V1 platform APIs are absent", func() {
+		// This envtest control plane installs only AWCP's CRD. The manager has
+		// already elected above, proving optional V1 APIs are not startup gates.
+		discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+		Expect(err).NotTo(HaveOccurred())
+		for _, feature := range []capability.Feature{
+			capability.ExternalSecrets,
+			capability.GatewayAPI,
+			capability.ArgoRollouts,
+			capability.ExternalMetrics,
+			capability.PrometheusMonitoring,
+		} {
+			requirement, ok := capability.RequirementFor(feature)
+			Expect(ok).To(BeTrue())
+			_, err = discoveryClient.ServerResourcesForGroupVersion(requirement.Resources[0].GroupVersion)
+			Expect(err).To(HaveOccurred(), "optional %s API must be absent from this isolated control plane", feature)
+		}
+		Eventually(mgr.Elected(), 2*time.Second).Should(BeClosed())
 	})
 
 	It("registers the namespaced API, syncs only its namespace and preserves status", func() {

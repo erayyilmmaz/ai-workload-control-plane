@@ -1,0 +1,26 @@
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: v0-compatible
+spec:
+  image: example.invalid/v0-compatible:v1
+  replicas: 2
+  container:
+    port: 8080
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  health:
+    readiness:
+      path: /ready
+  service:
+    enabled: true
+    port: 8080
+  secretRefs:
+    - v0-settings
+  network:
+    enabled: true

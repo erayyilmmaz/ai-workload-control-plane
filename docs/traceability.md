@@ -36,7 +36,8 @@ dedicated identity and Secret missing/restore decisions; [AWCP-9](verification/A
 activates standard ingress-only NetworkPolicy generation; [AWCP-10](verification/AWCP-10.md)
 activates generation-aware conditions, readiness and bounded Events. [AWCP-17](verification/AWCP-17.md)
 now provides the clean-user Quick Start, three public examples, narrated portfolio
-demo and release-preparation boundary.
+demo and release-preparation boundary. [AWCP-19](verification/AWCP-19.md) starts
+the V1 compatibility contract while preserving the V0 `v1alpha1` runtime surface.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |
@@ -56,6 +57,7 @@ demo and release-preparation boundary.
 | 14 / AWC-14 | AWCP-15 | Kustomize package, install/uninstall guide | Install/upgrade/undeploy + explicit cleanup checks | AWCP-14 |
 | 15 / AWC-15 | AWCP-16 | GitHub Actions and supply-chain policy | Hosted checks; merge ruleset verified separately | AWCP-13, 14 |
 | 16 / AWC-16 | AWCP-17 | README/examples, 16-step demo, release preparation | Clean-user kind demo; release publication evidence remains separate | AWCP-15, 16 |
+| V1-01 | AWCP-19 | V1 API/versioning/capability baseline | V0 strict envtest fixture; unit capability detection; optional-API startup envtest | AWCP-17 |
 
 Each behavior gets relevant tests while it is implemented. AWCP-13 consolidates regression coverage; it does not postpone all tests until the end. Status logic introduced early may use temporary fixtures until the full lifecycle is available.
 

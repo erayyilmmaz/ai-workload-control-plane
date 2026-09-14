@@ -91,6 +91,17 @@ AWCP-3 bootstrap entry point, after installing the exact tools, is `kubebuilder 
 
 Pin exact versions; no `latest`, `1.36.x`, floating branch or wildcard tool selectors in reproducible workflows. An update must change the lock, local/CI configuration and this matrix together, then run generation, build, relevant unit/envtest and kind tests. Library minimums, source compatibility, asset availability and executed runtime compatibility are separate claims.
 
+## V1 compatibility boundary
+
+AWCP-19 keeps the executed V0 baseline at envtest 1.36.2 and kind 1.36.4. It does
+not claim that every V1 optional platform feature is available on that baseline.
+The [V1 API evolution matrix](v1-api-evolution.md#compatibility-matrix) records
+feature-specific prerequisites and evidence ownership. In particular,
+ValidatingAdmissionPolicy is stable from Kubernetes 1.30, while native HPA
+scale-to-zero needs Kubernetes 1.37 plus an object or external metric. A future
+Kubernetes minor rebaseline is a deliberate lock/CI/CRD decision, not an implicit
+effect of adding V1 API documentation.
+
 The local host currently exposes Docker, kind, kubectl, Node and Python on PATH; Go, Kubebuilder, standalone Kustomize and golangci-lint were not found on PATH during AWCP-2. Installation and process execution belong to AWCP-3. No user's global toolchain, Docker cluster or kubeconfig was changed by this design milestone.
 
 ## AWCP-3 bootstrap adaptations

@@ -1,6 +1,9 @@
 # Architecture decision records
 
-All eight records are accepted design decisions for AWCP-2, dated 2026-09-12. Acceptance does not imply runtime implementation. Changes should explain what supersedes the previous decision and update the affected contract/tests together.
+ADR-001..008 are accepted V0 design decisions for AWCP-2. ADR-009..010 are the
+accepted V1 baseline decisions for AWCP-19. Acceptance does not imply runtime
+implementation. Changes should explain what supersedes the previous decision and
+update the affected contract/tests together.
 
 | Record | Decision |
 | --- | --- |
@@ -12,5 +15,7 @@ All eight records are accepted design decisions for AWCP-2, dated 2026-09-12. Ac
 | [ADR-006](ADR-006-observability-model.md) | Observability Model |
 | [ADR-007](ADR-007-api-versioning-strategy.md) | API Versioning Strategy |
 | [ADR-008](ADR-008-deletion-and-finalizers.md) | Deletion and Finalizers |
+| [ADR-009](ADR-009-v1-api-evolution.md) | V1 API Evolution and Migration Boundary |
+| [ADR-010](ADR-010-optional-platform-capabilities.md) | Optional Platform Capabilities |
 
 See [traceability](../traceability.md) for the story and test layer responsible for implementing each decision.
