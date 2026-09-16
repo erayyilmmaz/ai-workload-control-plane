@@ -23,7 +23,8 @@ watches exactly one namespace. Unique parent names (`gitops-demo-dev`,
 independent. This is delivery separation, not namespace or tenant isolation.
 
 Dev and staging use automated sync/self-heal. The prod generated Application has
-automated sync disabled and needs an explicit sync after a reviewed Git change.
+automated sync and self-heal disabled and needs an explicit sync after a reviewed
+Git change.
 Production promotion must additionally use a protected promotion branch, signed
 tag or immutable commit/image digest; this reference repository does not claim to
 configure those external Git or registry controls.

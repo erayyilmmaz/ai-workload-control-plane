@@ -86,7 +86,7 @@ wait_application_sync awcp-platform
 "$kubectl" -n awcp-system rollout status deployment/awcp-controller-manager --timeout=300s
 sed -e "s|repoURL: https://github.com/erayyilmmaz/ai-workload-control-plane.git|repoURL: $repo_url|g" -e "s|revision: main|revision: $revision|g" -e "s|targetRevision: main|targetRevision: $revision|g" gitops/argocd/applications/awcp-environments.yaml | "$kubectl" apply -f -
 for app in awcp-dev awcp-staging; do wait_application_sync "$app"; done
-"$kubectl" -n argocd get application/awcp-prod -o json | jq -e '.spec.syncPolicy.automated.enabled == false' >/dev/null
+"$kubectl" -n argocd get application/awcp-prod -o json | jq -e '.spec.syncPolicy.automated.enabled == false and .spec.syncPolicy.automated.selfHeal == false' >/dev/null
 # Production is intentionally not auto-synced. This is the explicit, auditable
 # promotion action for the disposable reference cluster; production uses a reviewed Git revision.
 "$kubectl" -n argocd patch application/awcp-prod --type=merge -p '{"operation":{"sync":{}}}'

@@ -107,7 +107,7 @@ The two Applications deliberately have different deletion policy:
 | --- | --- | --- | --- | --- |
 | `awcp-platform` | enabled | enabled | disabled | A Git mistake must not automatically remove a CRD, RBAC or namespace. Platform removal is an administrator decision. |
 | `awcp-dev`, `awcp-staging` | enabled | enabled | enabled, `allowEmpty: false` | Each Application owns exactly its Git directory's parent. A wrong overlay cannot alter another environment's source path or parent name. |
-| `awcp-prod` | disabled; explicit approved sync | enabled after sync | enabled, `allowEmpty: false` | Production Git changes are review/promotion actions, not automatic delivery from this local reference branch. |
+| `awcp-prod` | disabled; explicit approved sync | disabled | enabled, `allowEmpty: false` | Production Git changes are review/promotion actions, not automatic delivery from this local reference branch. |
 
 Both Applications retry a failed sync at most five times using a bounded
 exponential backoff (5 seconds, factor 2, maximum 3 minutes). The pinned Argo CD

@@ -51,7 +51,7 @@ spec:
           enabled: false
           prune: true
           allowEmpty: false
-          selfHeal: true
+          selfHeal: false
         retry:
           limit: 5
           backoff:
