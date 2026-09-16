@@ -25,5 +25,7 @@ printf '%s\n' "$applications" | grep -Fq 'selfHeal: true'
 ! rg -n '^kind: (Deployment|Service|ServiceAccount|NetworkPolicy)$' gitops/workloads
 grep -Fq 'installManifestSHA256: 9a87f2b3e14c278f12501eb0ef5c3955b27cf05370ca425381c6a908cf85a5c5' gitops/argocd/installation.lock.yaml
 grep -Fq 'version: 10.9.0' gitops/argocd/installation.lock.yaml
+grep -Fq 'apply --server-side --force-conflicts' docs/gitops.md test/e2e/gitops-e2e.sh
+grep -Fq 'create namespace argocd' test/e2e/gitops-e2e.sh
 ! rg -n -i '(password|token|clientsecret):\s*[^#[:space:]]' gitops/argocd
 echo 'PASS: GitOps sources are renderable, bounded to parent AIWorkloads and free of committed credentials'

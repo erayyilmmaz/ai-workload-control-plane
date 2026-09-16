@@ -61,8 +61,11 @@ make gitops-bootstrap
 
 This command uses the pinned Helm chart and changes the selected cluster; it is
 never run by CI. To use the official pinned manifest instead, first verify the
-SHA-256 in `gitops/argocd/installation.lock.yaml`, then apply its URL to the
-deliberately selected context.
+SHA-256 in `gitops/argocd/installation.lock.yaml`, then create the `argocd`
+namespace and apply the downloaded file with
+`kubectl apply --server-side --force-conflicts -n argocd -f <verified-file>` to
+the deliberately selected context. Server-side apply avoids the Kubernetes
+client-side annotation limit on Argo CD's large ApplicationSet CRD.
 
 After Argo CD is healthy, bootstrap the AWCP Project and platform Application.
 Do not use `kubectl apply` for `AIWorkload` manifests after this one-time setup:
@@ -93,8 +96,9 @@ The two Applications deliberately have different deletion policy:
 | `awcp-workloads` | enabled | enabled | enabled, `allowEmpty: false` | Removing one parent manifest from Git prunes that parent and Kubernetes garbage-collects only its AWCP-owned children. An accidentally empty workload source is blocked. |
 
 Both Applications retry a failed sync at most five times using a bounded
-exponential backoff (5 seconds, factor 2, maximum 3 minutes), and refresh retry
-state when a new revision arrives. Manual mutation of a parent `AIWorkload` is
+exponential backoff (5 seconds, factor 2, maximum 3 minutes). The pinned Argo CD
+3.5.2 API does not expose a retry-refresh field, so a new Git revision is the
+explicit next reconciliation input. Manual mutation of a parent `AIWorkload` is
 reverted by self-heal; manual mutation/deletion of an owned child is AWCP's drift
 reconciliation responsibility.
 

@@ -71,7 +71,10 @@ created=true
 manifest="$scratch/argocd-install.yaml"
 curl --fail --location --silent --show-error https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.2/manifests/install.yaml > "$manifest"
 test "$(shasum -a 256 "$manifest" | awk '{print $1}')" = '9a87f2b3e14c278f12501eb0ef5c3955b27cf05370ca425381c6a908cf85a5c5'
-"$kubectl" apply -f "$manifest"
+# The ApplicationSet CRD exceeds the client-side apply annotation limit on this
+# Kubernetes baseline; this is the documented server-side CRD install path.
+"$kubectl" create namespace argocd
+"$kubectl" apply --server-side --force-conflicts -n argocd -f "$manifest"
 "$kubectl" -n argocd rollout status deployment/argocd-server --timeout=300s
 "$kubectl" -n argocd rollout status deployment/argocd-repo-server --timeout=300s
 "$kubectl" -n argocd rollout status deployment/argocd-applicationset-controller --timeout=300s
