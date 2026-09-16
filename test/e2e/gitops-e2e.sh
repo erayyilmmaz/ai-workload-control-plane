@@ -89,7 +89,12 @@ wait_application_sync awcp-workloads
 wait_workload_ready
 
 child="awcp-gitops-demo-$(printf '%s' gitops-demo | shasum -a 256 | awk '{print substr($1, 1, 16)}')"
-"$kubectl" -n awcp-workloads get "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child" >/dev/null
+for resource in "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child"; do
+  "$kubectl" -n awcp-workloads get "$resource" -o json | jq -e '
+    any(.metadata.ownerReferences[]?; .apiVersion == "platform.example.io/v1alpha1" and .kind == "AIWorkload" and .name == "gitops-demo") and
+    ((.metadata.annotations["argocd.argoproj.io/tracking-id"] // "") == "")
+  ' >/dev/null
+done
 "$kubectl" -n awcp-workloads patch aiworkload/gitops-demo --type=merge -p '{"spec":{"replicas":2}}'
 wait_workload_ready
 "$kubectl" -n awcp-workloads get aiworkload/gitops-demo -o json | jq -e '.spec.replicas == 1' >/dev/null

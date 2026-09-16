@@ -38,8 +38,8 @@ activates generation-aware conditions, readiness and bounded Events. [AWCP-17](v
 now provides the clean-user Quick Start, three public examples, narrated portfolio
 demo and release-preparation boundary. [AWCP-19](verification/AWCP-19.md) starts
 the V1 compatibility contract while preserving the V0 `v1alpha1` runtime surface.
-AWCP-20 establishes the GitOps/Argo CD ownership boundary without changing the
-operator's resource ownership model.
+[AWCP-20](verification/AWCP-20.md) establishes the GitOps/Argo CD ownership
+boundary without changing the operator's resource ownership model.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |

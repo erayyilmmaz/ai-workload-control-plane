@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-for file in examples/basic.yaml examples/with-secrets.yaml examples/network-policy.yaml demo/portfolio-demo.sh docs/demo.md docs/release.md docs/gitops.md docs/verification/AWCP-17.md docs/verification/AWCP-19.md docs/adr/ADR-009-v1-api-evolution.md docs/adr/ADR-010-optional-platform-capabilities.md docs/adr/ADR-011-gitops-ownership-boundary.md test/fixtures/v1/v0-compatible.yaml; do
+for file in examples/basic.yaml examples/with-secrets.yaml examples/network-policy.yaml demo/portfolio-demo.sh docs/demo.md docs/release.md docs/gitops.md docs/verification/AWCP-17.md docs/verification/AWCP-19.md docs/verification/AWCP-20.md docs/adr/ADR-009-v1-api-evolution.md docs/adr/ADR-010-optional-platform-capabilities.md docs/adr/ADR-011-gitops-ownership-boundary.md test/fixtures/v1/v0-compatible.yaml; do
   test -s "$file"
 done
 test -x demo/portfolio-demo.sh
