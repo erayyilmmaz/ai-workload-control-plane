@@ -15,10 +15,13 @@ gitops/
 ├── platform/
 │   └── base/               # AppProject governance boundary
 └── workloads/
-    └── base/               # the Git-managed AIWorkload desired state
+    ├── base/               # common parent-only AIWorkload definition
+    └── environments/       # dev, staging and prod Kustomize overlays
 ```
 
-`gitops/workloads/base` deliberately contains only the parent `AIWorkload`. The
+Each `gitops/workloads/environments/<environment>` overlay deliberately contains
+only the parent `AIWorkload`. The ApplicationSet directory generator creates one
+Argo Application per directory. The
 operator owns its generated Deployment, Service, ServiceAccount and NetworkPolicy
 through Kubernetes owner references; Argo CD must not add those child objects to
 Git or a separate Application.

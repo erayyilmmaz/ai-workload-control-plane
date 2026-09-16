@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: awcp-environments
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: ai-workload-control-plane
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - git:
+        repoURL: https://github.com/erayyilmmaz/ai-workload-control-plane.git
+        revision: main
+        directories:
+          - path: gitops/workloads/environments/*
+  template:
+    metadata:
+      name: 'awcp-{{.path.basename}}'
+      labels:
+        app.kubernetes.io/part-of: ai-workload-control-plane
+        platform.example.io/environment: '{{.path.basename}}'
+    spec:
+      project: awcp-platform
+      source:
+        repoURL: https://github.com/erayyilmmaz/ai-workload-control-plane.git
+        targetRevision: main
+        path: 'gitops/workloads/environments/{{.path.basename}}'
+      destination:
+        server: https://kubernetes.default.svc
+        # Local/reference profile: the V0 manager watches this one namespace.
+        namespace: awcp-workloads
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: true
+          allowEmpty: false
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+  templatePatch: |
+    {{- if eq .path.basename "prod" }}
+    spec:
+      syncPolicy:
+        automated:
+          enabled: false
+          prune: true
+          allowEmpty: false
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+    {{- end }}

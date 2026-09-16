@@ -25,6 +25,7 @@ const (
 	HTTPPortName           = "http"
 	InstanceLabel          = "app.kubernetes.io/instance"
 	UIDLabel               = "platform.example.io/workload-uid"
+	EnvironmentLabel       = "platform.example.io/environment"
 	WorkloadNameAnnotation = "platform.example.io/workload-name"
 )
 
@@ -71,6 +72,11 @@ func managedMetadata(m *metav1.ObjectMeta, p *platform.AIWorkload) {
 	m.Labels["app.kubernetes.io/name"] = "ai-workload"
 	m.Labels["app.kubernetes.io/part-of"] = "ai-workload-control-plane"
 	m.Labels["app.kubernetes.io/managed-by"] = "awcp-controller"
+	if p.Spec.Environment != "" {
+		m.Labels[EnvironmentLabel] = p.Spec.Environment
+	} else {
+		delete(m.Labels, EnvironmentLabel)
+	}
 	if m.Annotations == nil {
 		m.Annotations = map[string]string{}
 	}

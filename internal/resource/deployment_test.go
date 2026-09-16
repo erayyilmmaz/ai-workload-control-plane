@@ -52,6 +52,7 @@ func build(t *testing.T, p *platform.AIWorkload) *appsv1.Deployment {
 
 func TestDeploymentMapping(t *testing.T) {
 	p := source()
+	p.Spec.Environment = "staging"
 	before := p.DeepCopy()
 	d := build(t, p)
 	pod := d.Spec.Template.Spec
@@ -73,6 +74,9 @@ func TestDeploymentMapping(t *testing.T) {
 		}
 		if labels["app.kubernetes.io/name"] != "ai-workload" || labels["app.kubernetes.io/managed-by"] != "awcp-controller" || labels["app.kubernetes.io/part-of"] != "ai-workload-control-plane" {
 			t.Fatal("common labels wrong")
+		}
+		if labels[EnvironmentLabel] != "staging" {
+			t.Fatal("environment label missing")
 		}
 	}
 	if d.Annotations[WorkloadNameAnnotation] != p.Name || d.Spec.Template.Annotations[WorkloadNameAnnotation] != p.Name {
@@ -121,6 +125,19 @@ func TestDeploymentMapping(t *testing.T) {
 	}
 	if d.Spec.Strategy.Type != appsv1.RollingUpdateDeploymentStrategyType || *d.Spec.Strategy.RollingUpdate.MaxSurge != intstr.FromInt32(1) || *d.Spec.Strategy.RollingUpdate.MaxUnavailable != intstr.FromInt32(0) || d.Spec.MinReadySeconds != 0 || ptr.Deref(d.Spec.ProgressDeadlineSeconds, 0) != 120 || d.Spec.Paused {
 		t.Fatal("rolling-update contract wrong")
+	}
+}
+
+func TestEnvironmentLabelIsRemovedWhenOmitted(t *testing.T) {
+	p := source()
+	p.Spec.Environment = "dev"
+	d := build(t, p)
+	p.Spec.Environment = ""
+	if err := intentFor(t, p).Mutate(d); err != nil {
+		t.Fatal(err)
+	}
+	if _, found := d.Labels[EnvironmentLabel]; found {
+		t.Fatal("omitted environment must not leave a stale child label")
 	}
 }
 

@@ -2,7 +2,6 @@ apiVersion: platform.example.io/v1alpha1
 kind: AIWorkload
 metadata:
   name: gitops-demo
-  namespace: awcp-workloads
   labels:
     app.kubernetes.io/part-of: ai-workload-control-plane
     app.kubernetes.io/managed-by: gitops

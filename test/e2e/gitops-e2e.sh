@@ -52,13 +52,13 @@ wait_application_sync() {
 }
 
 wait_workload_ready() {
-  local attempt state
-  for attempt in $(seq 1 180); do
-    state="$("$kubectl" -n awcp-workloads get aiworkload/gitops-demo -o json 2>/dev/null || true)"
-    if test -n "$state" && jq -e '(.spec.replicas == 1) and ([.status.conditions[]? | select(.type == "Ready" and .status == "True" and .reason == "WorkloadReady")] | length == 1)' <<<"$state" >/dev/null; then return 0; fi
-    sleep 1
-  done
-  echo 'Git-sourced AIWorkload did not become Ready' >&2
+	local name="$1" replicas="$2" attempt state
+	for attempt in $(seq 1 180); do
+		state="$("$kubectl" -n awcp-workloads get "aiworkload/$name" -o json 2>/dev/null || true)"
+		if test -n "$state" && jq -e --argjson replicas "$replicas" '(.spec.replicas == $replicas) and ([.status.conditions[]? | select(.type == "Ready" and .status == "True" and .reason == "WorkloadReady")] | length == 1)' <<<"$state" >/dev/null; then return 0; fi
+		sleep 1
+	done
+	echo "Git-sourced AIWorkload $name did not become Ready" >&2
   return 1
 }
 
@@ -84,18 +84,29 @@ kustomize=.tools/bin/kustomize-"$(jq -r '.tools.kustomize' toolchain.lock.json)"
 sed "s|repoURL: https://github.com/erayyilmmaz/ai-workload-control-plane.git|repoURL: $repo_url|; s|targetRevision: main|targetRevision: $revision|" gitops/argocd/applications/awcp-platform.yaml | "$kubectl" apply -f -
 wait_application_sync awcp-platform
 "$kubectl" -n awcp-system rollout status deployment/awcp-controller-manager --timeout=300s
-sed "s|repoURL: https://github.com/erayyilmmaz/ai-workload-control-plane.git|repoURL: $repo_url|; s|targetRevision: main|targetRevision: $revision|" gitops/argocd/applications/awcp-workloads.yaml | "$kubectl" apply -f -
-wait_application_sync awcp-workloads
-wait_workload_ready
+sed -e "s|repoURL: https://github.com/erayyilmmaz/ai-workload-control-plane.git|repoURL: $repo_url|g" -e "s|revision: main|revision: $revision|g" -e "s|targetRevision: main|targetRevision: $revision|g" gitops/argocd/applications/awcp-environments.yaml | "$kubectl" apply -f -
+for app in awcp-dev awcp-staging; do wait_application_sync "$app"; done
+"$kubectl" -n argocd get application/awcp-prod -o json | jq -e '.spec.syncPolicy.automated.enabled == false' >/dev/null
+# Production is intentionally not auto-synced. This is the explicit, auditable
+# promotion action for the disposable reference cluster; production uses a reviewed Git revision.
+"$kubectl" -n argocd patch application/awcp-prod --type=merge -p '{"operation":{"sync":{}}}'
+wait_application_sync awcp-prod
 
-child="awcp-gitops-demo-$(printf '%s' gitops-demo | shasum -a 256 | awk '{print substr($1, 1, 16)}')"
-for resource in "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child"; do
-  "$kubectl" -n awcp-workloads get "$resource" -o json | jq -e '
-    any(.metadata.ownerReferences[]?; .apiVersion == "platform.example.io/v1alpha1" and .kind == "AIWorkload" and .name == "gitops-demo") and
-    ((.metadata.annotations["argocd.argoproj.io/tracking-id"] // "") == "")
-  ' >/dev/null
+for entry in 'dev 1' 'staging 2' 'prod 3'; do
+	read -r environment replicas <<<"$entry"
+	parent="gitops-demo-$environment"
+	wait_workload_ready "$parent" "$replicas"
+	"$kubectl" -n awcp-workloads get "aiworkload/$parent" -o json | jq -e --arg environment "$environment" '.spec.environment == $environment and .metadata.labels["platform.example.io/environment"] == $environment' >/dev/null
+	child="awcp-$parent-$(printf '%s' "$parent" | shasum -a 256 | awk '{print substr($1, 1, 16)}')"
+	for resource in "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child"; do
+		"$kubectl" -n awcp-workloads get "$resource" -o json | jq -e --arg parent "$parent" --arg environment "$environment" '
+      any(.metadata.ownerReferences[]?; .apiVersion == "platform.example.io/v1alpha1" and .kind == "AIWorkload" and .name == $parent) and
+      ((.metadata.annotations["argocd.argoproj.io/tracking-id"] // "") == "") and
+      .metadata.labels["platform.example.io/environment"] == $environment
+    ' >/dev/null
+	done
 done
-"$kubectl" -n awcp-workloads patch aiworkload/gitops-demo --type=merge -p '{"spec":{"replicas":2}}'
-wait_workload_ready
-"$kubectl" -n awcp-workloads get aiworkload/gitops-demo -o json | jq -e '.spec.replicas == 1' >/dev/null
-echo 'PASS: Argo CD reconciled Git-sourced AWCP platform/workload and self-healed the parent without managing its generated children'
+"$kubectl" -n awcp-workloads patch aiworkload/gitops-demo-dev --type=merge -p '{"spec":{"replicas":4}}'
+wait_workload_ready gitops-demo-dev 1
+"$kubectl" -n awcp-workloads get aiworkload/gitops-demo-dev -o json | jq -e '.spec.replicas == 1' >/dev/null
+echo 'PASS: Argo CD rendered dev/staging/prod Applications from Git directories, required explicit prod promotion, and AWCP owned each environment child subtree'

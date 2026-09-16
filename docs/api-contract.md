@@ -18,6 +18,7 @@ One served/storage version and the `/status` subresource are implemented. No con
 
 | Path | V0 contract |
 | --- | --- |
+| spec.environment | Optional V1 logical DNS-label identity (1..63 characters), such as `dev`, `staging` or `prod`; it labels AWCP-owned children but never chooses namespace, cluster or permissions |
 | spec.image | Required string, 1..2048 characters, no whitespace (including Unicode space); image availability/non-root execution are runtime concerns |
 | spec.replicas | Integer, default 1, range 0..20; explicit 0 is preserved |
 | spec.container.port | Required integer 1..65535; named container port `http`, TCP |
@@ -135,7 +136,7 @@ only the minimal object; the full sample can be applied explicitly.
 Server-generated printer columns are NAME (Kubernetes metadata), READY, REPLICAS
 (desired spec count), IMAGE and AGE. Missing Ready status is deliberately blank.
 
-No breaking alpha schema change is silent: update schema, examples, compatibility notes and fixtures together. Later API conversion or production group migration is a separate decision.
+No breaking alpha schema change is silent: update schema, examples, compatibility notes and fixtures together. `spec.environment` is the first V1 optional field: omitting it preserves the V0 rendered objects, while a present value is copied only into the bounded `platform.example.io/environment` label on AWCP-owned children. Later API conversion or production group migration is a separate decision.
 
 ## References
 

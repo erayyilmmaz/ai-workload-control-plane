@@ -38,7 +38,7 @@ only in their owning story after schema, builder, status and lifecycle tests exi
 
 | Planned field | Owning story | Contract direction | Absent-field behavior |
 | --- | --- | --- | --- |
-| `spec.environment` | AWCP-21 | Logical environment identity; it never selects a namespace or cluster | Existing namespace/manifest behavior is unchanged |
+| `spec.environment` | AWCP-21 | Implemented optional logical environment identity; it labels AWCP-owned children and never selects a namespace or cluster | Existing namespace/manifest behavior is unchanged |
 | `spec.tenant` | AWCP-23 | Tenant profile/name, constrained to namespace policy and labels | No new tenant object or cluster permission is inferred |
 | `spec.autoscaling` | AWCP-27 | HPA intent, min/max/metrics/behavior | `replicas` remains controller-owned as in V0 |
 | `spec.exposure` | AWCP-26 | ClusterLocal or external HTTPRoute intent | Existing ClusterIP Service behavior is unchanged |

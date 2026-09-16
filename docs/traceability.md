@@ -61,6 +61,7 @@ boundary without changing the operator's resource ownership model.
 | 16 / AWC-16 | AWCP-17 | README/examples, 16-step demo, release preparation | Clean-user kind demo; release publication evidence remains separate | AWCP-15, 16 |
 | V1-01 | AWCP-19 | V1 API/versioning/capability baseline | V0 strict envtest fixture; unit capability detection; optional-API startup envtest | AWCP-17 |
 | V1-02 | AWCP-20 | GitOps repository model and Argo CD integration | Kustomize/static GitOps validation; disposable kind Argo CD demo | AWCP-19 |
+| V1-03 | AWCP-21 | Multi-environment GitOps delivery and ApplicationSet | Overlay rendering, environment API/child labels and disposable kind promotion demo | AWCP-20 |
 
 Each behavior gets relevant tests while it is implemented. AWCP-13 consolidates regression coverage; it does not postpone all tests until the end. Status logic introduced early may use temporary fixtures until the full lifecycle is available.
 

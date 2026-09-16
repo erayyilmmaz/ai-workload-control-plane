@@ -66,6 +66,15 @@ spec:
                 required:
                 - port
                 type: object
+              environment:
+                description: |-
+                  Environment is an optional logical delivery identity such as dev, staging or
+                  prod. It labels AWCP-owned children but never selects a namespace, cluster or
+                  permission boundary.
+                maxLength: 63
+                minLength: 1
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
               health:
                 description: Health enables only explicitly present readiness/liveness
                   HTTP probe blocks.
