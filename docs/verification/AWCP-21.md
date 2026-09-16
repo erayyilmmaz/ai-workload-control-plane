@@ -20,7 +20,7 @@
 ## Real-cluster evidence
 
 On 2026-09-16, `make gitops-e2e` ran against public commit
-`199e9994b369e1b42b786d3bc9546edd8fffd57f` on local macOS ARM64 Docker/kind.
+`6d829265dbddc7d8be44239a830dcf4f7c211164` on local macOS ARM64 Docker/kind.
 It created and deleted an isolated `awcp-gitops-*` cluster, checksum-verified and
 server-side applied the pinned Argo CD v3.5.2 manifest, then synchronized the
 AWCP platform from the pinned remote commit.
