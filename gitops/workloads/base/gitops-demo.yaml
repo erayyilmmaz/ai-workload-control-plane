@@ -1,0 +1,18 @@
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: gitops-demo
+  namespace: awcp-workloads
+  labels:
+    app.kubernetes.io/part-of: ai-workload-control-plane
+    app.kubernetes.io/managed-by: gitops
+spec:
+  image: awcp-demo:v1
+  replicas: 1
+  container:
+    port: 8080
+  service:
+    enabled: true
+    port: 80
+  network:
+    enabled: true

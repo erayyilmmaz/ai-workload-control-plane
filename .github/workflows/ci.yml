@@ -80,7 +80,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/bootstrap
-      - run: make test-unit && make demo-test && make verify-docs
+      - run: make test-unit && make demo-test && make verify-docs && make gitops-verify
 
   envtest:
     name: envtest

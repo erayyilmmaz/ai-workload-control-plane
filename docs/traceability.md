@@ -38,6 +38,8 @@ activates generation-aware conditions, readiness and bounded Events. [AWCP-17](v
 now provides the clean-user Quick Start, three public examples, narrated portfolio
 demo and release-preparation boundary. [AWCP-19](verification/AWCP-19.md) starts
 the V1 compatibility contract while preserving the V0 `v1alpha1` runtime surface.
+AWCP-20 establishes the GitOps/Argo CD ownership boundary without changing the
+operator's resource ownership model.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |
@@ -58,6 +60,7 @@ the V1 compatibility contract while preserving the V0 `v1alpha1` runtime surface
 | 15 / AWC-15 | AWCP-16 | GitHub Actions and supply-chain policy | Hosted checks; merge ruleset verified separately | AWCP-13, 14 |
 | 16 / AWC-16 | AWCP-17 | README/examples, 16-step demo, release preparation | Clean-user kind demo; release publication evidence remains separate | AWCP-15, 16 |
 | V1-01 | AWCP-19 | V1 API/versioning/capability baseline | V0 strict envtest fixture; unit capability detection; optional-API startup envtest | AWCP-17 |
+| V1-02 | AWCP-20 | GitOps repository model and Argo CD integration | Kustomize/static GitOps validation; disposable kind Argo CD demo | AWCP-19 |
 
 Each behavior gets relevant tests while it is implemented. AWCP-13 consolidates regression coverage; it does not postpone all tests until the end. Status logic introduced early may use temporary fixtures until the full lifecycle is available.
 

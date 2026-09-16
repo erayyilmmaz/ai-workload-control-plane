@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: awcp-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: ai-workload-control-plane
+spec:
+  project: awcp-platform
+  source:
+    repoURL: https://github.com/erayyilmmaz/ai-workload-control-plane.git
+    targetRevision: main
+    path: config/default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: awcp-system
+  syncPolicy:
+    automated:
+      enabled: true
+      # CRD, RBAC and Namespace removal requires an explicit administrator action.
+      prune: false
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+        refresh: true

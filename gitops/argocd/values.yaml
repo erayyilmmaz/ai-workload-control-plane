@@ -1,0 +1,18 @@
+# Optional Helm bootstrap values for the exact chart in installation.lock.yaml.
+# This is a single-node local/reference profile, not a production HA/security
+# baseline. It intentionally contains no repository credentials or admin secret.
+global:
+  domain: argocd.localhost
+configs:
+  cm:
+    timeout.reconciliation: 60s
+    timeout.reconciliation.jitter: 0s
+  params:
+    server.insecure: true
+server:
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+notifications:
+  enabled: false

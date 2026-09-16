@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: awcp-platform
+  namespace: argocd
+spec:
+  description: AWCP Git-managed platform package and parent workload manifests only.
+  sourceRepos:
+    - https://github.com/erayyilmmaz/ai-workload-control-plane.git
+  destinations:
+    - namespace: awcp-system
+      server: https://kubernetes.default.svc
+    - namespace: awcp-workloads
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: Service
+    - group: apps
+      kind: Deployment
+    - group: coordination.k8s.io
+      kind: Lease
+    - group: events.k8s.io
+      kind: Event
+    - group: platform.example.io
+      kind: AIWorkload
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding

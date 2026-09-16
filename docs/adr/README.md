@@ -1,9 +1,10 @@
 # Architecture decision records
 
-ADR-001..008 are accepted V0 design decisions for AWCP-2. ADR-009..010 are the
-accepted V1 baseline decisions for AWCP-19. Acceptance does not imply runtime
-implementation. Changes should explain what supersedes the previous decision and
-update the affected contract/tests together.
+ADR-001..008 are accepted V0 design decisions for AWCP-2. ADR-009..010 establish
+the AWCP-19 V1 compatibility baseline; ADR-011 establishes the AWCP-20 GitOps
+ownership boundary. Acceptance does not imply runtime implementation. Changes
+should explain what supersedes the previous decision and update affected
+contract/tests together.
 
 | Record | Decision |
 | --- | --- |
@@ -17,5 +18,6 @@ update the affected contract/tests together.
 | [ADR-008](ADR-008-deletion-and-finalizers.md) | Deletion and Finalizers |
 | [ADR-009](ADR-009-v1-api-evolution.md) | V1 API Evolution and Migration Boundary |
 | [ADR-010](ADR-010-optional-platform-capabilities.md) | Optional Platform Capabilities |
+| [ADR-011](ADR-011-gitops-ownership-boundary.md) | GitOps Ownership Boundary |
 
 See [traceability](../traceability.md) for the story and test layer responsible for implementing each decision.

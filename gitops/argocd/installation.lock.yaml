@@ -1,0 +1,10 @@
+# Reviewed on 2026-09-16. Updating either installer is an explicit GitOps change.
+argoCD:
+  version: v3.5.2
+  installManifestURL: https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.2/manifests/install.yaml
+  installManifestSHA256: 9a87f2b3e14c278f12501eb0ef5c3955b27cf05370ca425381c6a908cf85a5c5
+helm:
+  repository: https://argoproj.github.io/argo-helm
+  chart: argo-cd
+  version: 10.9.0
+  appVersion: v3.5.2

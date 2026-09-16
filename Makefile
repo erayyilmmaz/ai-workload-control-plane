@@ -26,9 +26,11 @@ DEPLOY_IMG ?=
 DEMO_IMG_V1 ?= awcp-demo:v1
 DEMO_IMG_V2 ?= awcp-demo:v2
 KIND_CLUSTER ?= awcp-quickstart
+GITOPS_REPO_URL ?= https://github.com/erayyilmmaz/ai-workload-control-plane.git
+GITOPS_REVISION ?= $(shell git rev-parse HEAD)
 REVISION ?= $(shell git rev-parse HEAD)
 
-.PHONY: bootstrap tools check-go tidy generate manifests fmt fmt-check build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated verify-docs render docker-build demo-test demo-build smoke e2e portfolio-demo kind kubectl kind-up kind-load kind-down quickstart install deploy undeploy release-bundle verify-package vuln verify-ci
+.PHONY: bootstrap tools check-go tidy generate manifests fmt fmt-check build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated verify-docs gitops-verify gitops-bootstrap gitops-e2e render docker-build demo-test demo-build smoke e2e portfolio-demo kind kubectl kind-up kind-load kind-down quickstart install deploy undeploy release-bundle verify-package vuln verify-ci
 bootstrap:
 	bash hack/bootstrap-tools.sh
 	$(MAKE) tools
@@ -88,11 +90,17 @@ coverage: check-go envtest
 	mkdir -p dist
 	$(GO) test -count=1 -covermode=atomic -coverpkg="$$($(GO) list ./... | paste -sd, -)" -coverprofile=dist/coverage.out ./...
 	$(GO) tool cover -func=dist/coverage.out > dist/coverage.txt
-verify: generate manifests build vet lint fmt-check test demo-test verify-generated verify-docs render
+verify: generate manifests build vet lint fmt-check test demo-test verify-generated verify-docs gitops-verify render
 verify-generated: $(CONTROLLER_GEN)
 	bash hack/verify-generated.sh
 verify-docs:
 	bash test/docs/verify-portfolio.sh
+gitops-verify: $(KUSTOMIZE)
+	bash test/gitops/verify-gitops.sh
+gitops-bootstrap:
+	bash gitops/argocd/bootstrap.sh
+gitops-e2e: render docker-build demo-build gitops-verify
+	bash test/e2e/gitops-e2e.sh "$(GITOPS_REPO_URL)" "$(GITOPS_REVISION)" "$(IMG)" "$(DEMO_IMG_V1)"
 render: $(KUSTOMIZE)
 	mkdir -p dist
 	$(KUSTOMIZE) build config/default > dist/install.yaml

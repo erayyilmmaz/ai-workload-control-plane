@@ -210,6 +210,7 @@ tag/release only with the resulting digest and evidence. Future platform hardeni
 ## Further reading
 
 - [Installation, upgrade and safe removal](docs/installation.md)
+- [GitOps and Argo CD ownership model](docs/gitops.md)
 - [Release preparation checklist](docs/release.md)
 - [Scope and non-goals](docs/scope.md)
 - [Acceptance traceability](docs/traceability.md)
