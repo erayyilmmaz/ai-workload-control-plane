@@ -7,8 +7,8 @@ trivy_bin="${2:?usage: verify.sh <terraform-bin> <trivy-bin>}"
 root="$(cd "$(dirname "$0")" && pwd)"
 
 test -s "$root/.terraform.lock.hcl"
-rg -q 'source *= *"hashicorp/aws"' "$root/versions.tf"
-! rg -n 'provider "kubernetes"|resource "kubernetes_|resource "argocd_|AIWorkload' "$root" --glob '*.tf'
+grep -Eq 'source *= *"hashicorp/aws"' "$root/versions.tf"
+! grep -REn --include='*.tf' 'provider "kubernetes"|resource "kubernetes_|resource "argocd_|AIWorkload' "$root"
 test "$("$terraform_bin" version -json | jq -r '.terraform_version')" = "1.16.2"
 
 "$terraform_bin" -chdir="$root" fmt -check -recursive
