@@ -26,12 +26,12 @@
 | `make lint fmt-check verify-generated render gitops-verify verify-docs` | geçti | format/lint, generated drift, Kustomize/GitOps render ve doküman sözleşmesi |
 | `git diff --check` ve `bash -n test/e2e/lifecycle-e2e.sh` | geçti | boşluk ve E2E shell sözleşmesi |
 | `make e2e` | yerelde çalıştırılamadı | Yerel Docker daemon socket’i erişilemediği için image build aşamasında durdu; kind cluster oluşturulmadı |
+| GitHub Actions [CI run 35443675361](https://github.com/erayyilmmaz/ai-workload-control-plane/actions/runs/35443675361) | geçti, 12/12 job | Commit `65b62be` için format, generated drift, unit, envtest, build, Docker, supply-chain, Terraform ve gerçek kind E2E |
 
 Kind E2E betiği tenant Role sınırını, tenant-bravo Secret’ının
 tenant-alpha’da görünmemesini, workload ServiceAccount’ının Secret okuyamamasını,
-LimitRange reddini ve ResourceQuota reddini doğrular. Bu canlı kabul kanıtı Docker
-erişimi olan GitHub Actions `e2e` job’ında veya Docker başlatılmış yerelde ayrıca
-gözlemlenmelidir.
+LimitRange reddini ve ResourceQuota reddini doğrular. Bu canlı kabul kanıtı,
+yukarıdaki Docker erişimli GitHub Actions `e2e` job’ında başarıyla gözlemlendi.
 
 ## Açık sınırlar
 
