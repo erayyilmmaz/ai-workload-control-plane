@@ -14,13 +14,13 @@ done
 "$kustomize" build gitops/platform/base | grep -Fq 'kind: AppProject'
 platform_rendered="$("$kustomize" build config/default)"
 for tenant in alpha bravo charlie; do
-  printf '%s\n' "$platform_rendered" | grep -Fq "name: awcp-tenant-$tenant"
+  [[ "$platform_rendered" == *"name: awcp-tenant-$tenant"* ]]
 done
 for kind in ConfigMap ResourceQuota LimitRange; do
-  printf '%s\n' "$platform_rendered" | grep -Fq "kind: $kind"
+  [[ "$platform_rendered" == *"kind: $kind"* ]]
 done
-printf '%s\n' "$platform_rendered" | grep -Fq 'name: awcp-tenant-profile'
-printf '%s\n' "$platform_rendered" | grep -Fq 'resourceNames:'
+[[ "$platform_rendered" == *'name: awcp-tenant-profile'* ]]
+[[ "$platform_rendered" == *'resourceNames:'* ]]
 ! rg -n '^kind: ClusterRole$|^kind: ClusterRoleBinding$' config/tenancy
 applications="$($kustomize build gitops/argocd/applications)"
 printf '%s\n' "$applications" | grep -Fq 'name: awcp-platform'
