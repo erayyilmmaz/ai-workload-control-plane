@@ -19,6 +19,7 @@ required status checks after a repository ruleset is configured:
 | `unit-test` / `envtest` | Fast/public-documentation guard and API-server-backed suites |
 | `build` / `docker-build` | Binary and digest-pinned container build |
 | `supply-chain` | Module tidiness, govulncheck, release-package and workflow-boundary checks |
+| `infra-validate` | Pinned Terraform/provider lock validation and high/critical IaC scan without cloud credentials, plan or apply |
 | `e2e` | Full disposable kind lifecycle, package deploy and safe undeploy |
 
 Every job has a timeout. Concurrency cancels stale runs for the same pull request
@@ -33,7 +34,7 @@ configure a GitHub ruleset/branch protection rule for `main` and select at least
 
 ```text
 format, lint, vet, generate-check, manifest-check,
-unit-test, envtest, build, docker-build, supply-chain, e2e
+unit-test, envtest, build, docker-build, supply-chain, infra-validate, e2e
 ```
 
 Require the branch to be up to date if that is the repository policy. Do not claim
@@ -65,6 +66,7 @@ make verify
 make verify-package
 make verify-ci
 make vuln
+make infra-verify
 make e2e
 ```
 

@@ -11,17 +11,18 @@ test -s "$workflow" && test -s "$bootstrap" && test -s "$dependabot"
 grep -Eq '^  contents: read$' "$workflow"
 grep -Eq '^concurrency:$' "$workflow"
 grep -Eq '^  cancel-in-progress: true$' "$workflow"
-for job in format lint vet generate-check manifest-check unit-test envtest build docker-build supply-chain e2e; do
+for job in format lint vet generate-check manifest-check unit-test envtest build docker-build supply-chain infra-validate e2e; do
   grep -Eq "^  $job:$" "$workflow"
 done
-test "$(grep -Ec 'timeout-minutes:' "$workflow")" = 11
-test "$(grep -Ec 'persist-credentials: false' "$workflow")" = 11
-test "$(grep -Ec 'actions/checkout@[0-9a-f]{40}' "$workflow")" = 11
+test "$(grep -Ec 'timeout-minutes:' "$workflow")" = 12
+test "$(grep -Ec 'persist-credentials: false' "$workflow")" = 12
+test "$(grep -Ec 'actions/checkout@[0-9a-f]{40}' "$workflow")" = 12
 grep -Eq 'actions/cache@[0-9a-f]{40}' "$bootstrap"
 grep -Eq 'make e2e' "$workflow"
 grep -Eq 'make vuln' "$workflow"
 grep -Eq 'make verify-docs' "$workflow"
 grep -Eq 'make gitops-verify' "$workflow"
+grep -Eq 'make infra-verify' "$workflow"
 grep -Eq 'git status --porcelain --untracked-files=all' "$workflow"
 grep -Eq 'FROM .+@sha256:[0-9a-f]{64}' Dockerfile examples/demo-app/Dockerfile
 grep -Eq 'package-ecosystem: gomod' "$dependabot"

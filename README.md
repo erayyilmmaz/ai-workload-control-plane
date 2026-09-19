@@ -165,7 +165,8 @@ the demo proves the underlying authenticated metrics endpoint. See
 ## Testing strategy
 
 ```bash
-make verify        # generated drift, build, vet, lint, format, unit/envtest and docs guard
+make verify        # generated drift, build, vet, lint, format, unit/envtest, docs and safe Terraform guard
+make infra-verify  # pinned Terraform/provider validation and high/critical IaC scan; never plans/applies
 make verify-ci     # workflow-security structure guard
 make vuln          # reachable Go vulnerability analysis
 make e2e           # disposable real-kind lifecycle acceptance
@@ -180,16 +181,18 @@ currently has no active ruleset. Evidence and boundaries are recorded in
 
 ## Architecture decisions
 
-The accepted tradeoffs are in [ADR-001 through ADR-008](docs/adr/README.md),
-including Kubernetes as source of truth, Go/controller-runtime, namespaced scope,
-ownership, least privilege, observability, alpha API versioning and no-finalizer
-deletion.
+The accepted tradeoffs are in [the ADR index](docs/adr/README.md), including
+Kubernetes as source of truth, Go/controller-runtime, namespaced scope, ownership,
+least privilege, GitOps delivery and Terraform/IaC separation.
 
 ## Limitations
 
 - Alpha portfolio project, not a production-ready platform or tenant boundary.
 - No GPU scheduling, inference serving, LLM gateway/model routing, agent runtime,
-  database, broker, cloud identity, HPA, webhook, multi-cluster or GitOps layer.
+  database, broker, cloud identity, HPA, webhook or multi-cluster runtime layer.
+- GitOps and AWS/EKS Terraform are reference/validation assets only: no private
+  repository, remote Terraform state, cloud apply, node pool, production Argo
+  bootstrap, signing or production-cluster evidence exists.
 - NetworkPolicy generation is proven; CNI traffic enforcement is not part of the
   default kind profile. There is no egress policy.
 - No automatic Secret rotation/revocation for an already running process.
@@ -211,6 +214,7 @@ tag/release only with the resulting digest and evidence. Future platform hardeni
 
 - [Installation, upgrade and safe removal](docs/installation.md)
 - [GitOps and Argo CD ownership model](docs/gitops.md)
+- [AWS/EKS Terraform reference](infra/terraform/README.md)
 - [Release preparation checklist](docs/release.md)
 - [Scope and non-goals](docs/scope.md)
 - [Acceptance traceability](docs/traceability.md)

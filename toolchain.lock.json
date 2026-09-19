@@ -29,6 +29,8 @@
     "kustomize": "v5.8.1",
     "golangciLint": "v2.12.2",
     "govulncheck": "v1.8.0",
+    "terraform": "1.16.2",
+    "trivy": "0.74.0",
     "kind": "v0.33.0",
     "kubectl": "v1.36.4"
   },
@@ -91,6 +93,16 @@
         "url": "https://dl.k8s.io/release/v1.36.4/bin/darwin/arm64/kubectl",
         "sha256": "c9e4f713d6fee0043a3d835cca13077cda2bc0973840eb9779360df0b5bdfc69",
         "verification": "AWCP-3: downloaded bytes match SHA-256; native CLI executed"
+      },
+      "terraform": {
+        "url": "https://releases.hashicorp.com/terraform/1.16.2/terraform_1.16.2_darwin_arm64.zip",
+        "sha256": "7c0a0b31c8aa541351369bcf7b62a7289fbc21de7e577669aeba6d42f4e6cc41",
+        "verification": "published_checksum; AWCP-22 reference validation requires a pinned local CLI"
+      },
+      "trivy": {
+        "url": "https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_macOS-ARM64.tar.gz",
+        "sha256": "1caada5e0e2091909357c7525d3aa76f4b660b13821bc143b190c7483e31cc11",
+        "verification": "published_checksum; AWCP-22 static IaC scan requires a pinned local CLI"
       }
     },
     "linux-amd64": {
@@ -118,6 +130,16 @@
         "url": "https://dl.k8s.io/release/v1.36.4/bin/linux/amd64/kubectl",
         "sha256": "8b8f088da2dab964f853b38464033b1be15ede2839eca751482357c45abdd05a",
         "verification": "published_checksum; not downloaded or executed"
+      },
+      "terraform": {
+        "url": "https://releases.hashicorp.com/terraform/1.16.2/terraform_1.16.2_linux_amd64.zip",
+        "sha256": "0d17011f0c4664539b164b044903d04e296c86c13cb9f28040076c65cfb3985a",
+        "verification": "published_checksum; required by AWCP-22 CI validation"
+      },
+      "trivy": {
+        "url": "https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz",
+        "sha256": "2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a",
+        "verification": "published_checksum; required by AWCP-22 CI static IaC scan"
       }
     }
   },

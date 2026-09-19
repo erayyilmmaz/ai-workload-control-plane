@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars only in an authorized infrastructure workspace.
+# Do not commit account identifiers, credentials, IP allow-lists or generated state.
+aws_region         = "eu-central-1"
+cluster_name       = "awcp-reference"
+kubernetes_version = "1.36"
+
+availability_zones  = ["eu-central-1a", "eu-central-1b"]
+vpc_cidr            = "10.42.0.0/16"
+private_subnet_cidrs = ["10.42.0.0/20", "10.42.16.0/20"]
+public_subnet_cidrs  = ["10.42.128.0/20", "10.42.144.0/20"]
+
+# Enabling this creates a billable NAT Gateway. Private-only EKS API access does
+# not by itself require it; worker egress is a separately approved network design.
+enable_nat_gateway = false
+
+tags = {
+  Environment = "reference"
+  Owner       = "platform-team"
+}

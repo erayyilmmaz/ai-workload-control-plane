@@ -1,8 +1,9 @@
 # Architecture decision records
 
 ADR-001..008 are accepted V0 design decisions for AWCP-2. ADR-009..010 establish
-the AWCP-19 V1 compatibility baseline; ADR-011 establishes the AWCP-20 GitOps
-ownership boundary. Acceptance does not imply runtime implementation. Changes
+the AWCP-19 V1 compatibility baseline; ADR-011/012 establish the AWCP-20/21
+GitOps delivery boundary; ADR-013 establishes AWCP-22 Terraform/IaC ownership.
+Acceptance does not imply runtime implementation. Changes
 should explain what supersedes the previous decision and update affected
 contract/tests together.
 
@@ -20,5 +21,6 @@ contract/tests together.
 | [ADR-010](ADR-010-optional-platform-capabilities.md) | Optional Platform Capabilities |
 | [ADR-011](ADR-011-gitops-ownership-boundary.md) | GitOps Ownership Boundary |
 | [ADR-012](ADR-012-environment-delivery-model.md) | Environment Delivery Model |
+| [ADR-013](ADR-013-terraform-and-gitops-ownership.md) | Terraform and GitOps Ownership Boundary |
 
 See [traceability](../traceability.md) for the story and test layer responsible for implementing each decision.

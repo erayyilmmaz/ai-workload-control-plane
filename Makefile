@@ -14,11 +14,15 @@ CONTROLLER_TOOLS_VERSION := $(shell jq -r '.tools.controllerTools' toolchain.loc
 KUSTOMIZE_VERSION := $(shell jq -r '.tools.kustomize' toolchain.lock.json)
 LINT_VERSION := $(shell jq -r '.tools.golangciLint' toolchain.lock.json)
 GOVULNCHECK_VERSION := $(shell jq -r '.tools.govulncheck' toolchain.lock.json)
+TERRAFORM_VERSION := $(shell jq -r '.tools.terraform' toolchain.lock.json)
+TRIVY_VERSION := $(shell jq -r '.tools.trivy' toolchain.lock.json)
 ENVTEST_REVISION := $(shell jq -r '.tools.setupEnvtest.revision' toolchain.lock.json)
 CONTROLLER_GEN := .tools/bin/controller-gen-$(CONTROLLER_TOOLS_VERSION)/controller-gen
 KUSTOMIZE := .tools/bin/kustomize-$(KUSTOMIZE_VERSION)/kustomize
 LINT := .tools/bin/golangci-lint-$(LINT_VERSION)/golangci-lint
 GOVULNCHECK := .tools/bin/govulncheck-$(GOVULNCHECK_VERSION)/govulncheck
+TERRAFORM := .tools/bin/terraform
+TRIVY := .tools/bin/trivy
 SETUP_ENVTEST := .tools/bin/setup-envtest-$(ENVTEST_REVISION)/setup-envtest
 IMG ?= awcp-manager:awcp-15
 VERSION ?= 0.1.0-dev
@@ -30,7 +34,7 @@ GITOPS_REPO_URL ?= https://github.com/erayyilmmaz/ai-workload-control-plane.git
 GITOPS_REVISION ?= $(shell git rev-parse HEAD)
 REVISION ?= $(shell git rev-parse HEAD)
 
-.PHONY: bootstrap tools check-go tidy generate manifests fmt fmt-check build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated verify-docs gitops-verify gitops-bootstrap gitops-e2e render docker-build demo-test demo-build smoke e2e portfolio-demo kind kubectl kind-up kind-load kind-down quickstart install deploy undeploy release-bundle verify-package vuln verify-ci
+.PHONY: bootstrap tools infra-tools infra-verify check-go tidy generate manifests fmt fmt-check build vet lint lint-fix test test-unit test-envtest test-race coverage envtest verify verify-generated verify-docs gitops-verify gitops-bootstrap gitops-e2e render docker-build demo-test demo-build smoke e2e portfolio-demo kind kubectl kind-up kind-load kind-down quickstart install deploy undeploy release-bundle verify-package vuln verify-ci
 bootstrap:
 	bash hack/bootstrap-tools.sh
 	$(MAKE) tools
@@ -47,6 +51,12 @@ tidy: check-go
 	$(GO) mod download
 
 tools: check-go $(CONTROLLER_GEN) $(KUSTOMIZE) $(LINT) $(SETUP_ENVTEST)
+
+infra-tools:
+	@test -x "$(TERRAFORM)" -a -x "$(TRIVY)" || bash hack/bootstrap-tools.sh terraform trivy
+
+infra-verify: infra-tools
+	bash infra/terraform/verify.sh "$(TERRAFORM)" "$(TRIVY)"
 
 $(CONTROLLER_GEN): toolchain.lock.json | check-go
 	GOBIN="$(CURDIR)/$(@D)" $(GO) install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
@@ -90,7 +100,7 @@ coverage: check-go envtest
 	mkdir -p dist
 	$(GO) test -count=1 -covermode=atomic -coverpkg="$$($(GO) list ./... | paste -sd, -)" -coverprofile=dist/coverage.out ./...
 	$(GO) tool cover -func=dist/coverage.out > dist/coverage.txt
-verify: generate manifests build vet lint fmt-check test demo-test verify-generated verify-docs gitops-verify render
+verify: generate manifests build vet lint fmt-check test demo-test verify-generated verify-docs gitops-verify infra-verify render
 verify-generated: $(CONTROLLER_GEN)
 	bash hack/verify-generated.sh
 verify-docs:

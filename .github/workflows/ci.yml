@@ -128,6 +128,17 @@ jobs:
       - run: git diff --exit-code && test -z "$(git status --porcelain --untracked-files=all)"
       - run: make vuln && make verify-package && make verify-ci
 
+  infra-validate:
+    name: infra-validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/bootstrap
+      - run: make infra-verify
+
   e2e:
     name: e2e
     runs-on: ubuntu-24.04

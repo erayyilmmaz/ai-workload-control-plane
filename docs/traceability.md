@@ -42,6 +42,8 @@ the V1 compatibility contract while preserving the V0 `v1alpha1` runtime surface
 boundary without changing the operator's resource ownership model.
 [AWCP-21](verification/AWCP-21.md) adds independently rendered dev/staging/prod
 parent delivery, keeping V0 behavior intact whenever `spec.environment` is absent.
+[AWCP-22](verification/AWCP-22.md) adds a provider-locked AWS/EKS infrastructure
+reference while preserving GitOps ownership of platform and workload manifests.
 
 | Step / source | Actual Jira | Deliverable / decision | Evidence layer | Direct prerequisites |
 | --- | --- | --- | --- | --- |
@@ -64,6 +66,7 @@ parent delivery, keeping V0 behavior intact whenever `spec.environment` is absen
 | V1-01 | AWCP-19 | V1 API/versioning/capability baseline | V0 strict envtest fixture; unit capability detection; optional-API startup envtest | AWCP-17 |
 | V1-02 | AWCP-20 | GitOps repository model and Argo CD integration | Kustomize/static GitOps validation; disposable kind Argo CD demo | AWCP-19 |
 | V1-03 | AWCP-21 | Multi-environment GitOps delivery and ApplicationSet | Overlay rendering, environment API/child labels and disposable kind promotion demo | AWCP-20 |
+| V1-04 | AWCP-22 | Terraform reference infrastructure | Pinned Terraform/provider lock, static validation and high/critical IaC scan without cloud credentials | AWCP-20, 21 |
 
 Each behavior gets relevant tests while it is implemented. AWCP-13 consolidates regression coverage; it does not postpone all tests until the end. Status logic introduced early may use temporary fixtures until the full lifecycle is available.
 

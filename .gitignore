@@ -7,4 +7,9 @@ cover.out
 .env
 .env.*
 !.env.example
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
 test/e2e/artifacts/

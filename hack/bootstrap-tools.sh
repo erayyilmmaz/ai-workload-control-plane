@@ -29,6 +29,8 @@ for tool in "${@:-go kubebuilder envtest}"; do
     case "$name" in
       go) tar -xzf "$archive" -C .tools ;;
       envtest) tar -xzf "$archive" -C .tools/envtest --strip-components=2 ;;
+      terraform) unzip -p "$archive" terraform > .tools/bin/terraform; chmod +x .tools/bin/terraform ;;
+      trivy) tar -xzf "$archive" -C .tools/bin trivy; chmod +x .tools/bin/trivy ;;
       *) cp "$archive" ".tools/bin/$name"; chmod +x ".tools/bin/$name" ;;
     esac
     echo "Verified and installed $name ($platform)"

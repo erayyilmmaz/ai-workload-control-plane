@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-for file in examples/basic.yaml examples/with-secrets.yaml examples/network-policy.yaml demo/portfolio-demo.sh docs/demo.md docs/release.md docs/gitops.md docs/verification/AWCP-17.md docs/verification/AWCP-19.md docs/verification/AWCP-20.md docs/verification/AWCP-21.md docs/adr/ADR-009-v1-api-evolution.md docs/adr/ADR-010-optional-platform-capabilities.md docs/adr/ADR-011-gitops-ownership-boundary.md docs/adr/ADR-012-environment-delivery-model.md test/fixtures/v1/v0-compatible.yaml; do
+for file in examples/basic.yaml examples/with-secrets.yaml examples/network-policy.yaml demo/portfolio-demo.sh docs/demo.md docs/release.md docs/gitops.md docs/verification/AWCP-17.md docs/verification/AWCP-19.md docs/verification/AWCP-20.md docs/verification/AWCP-21.md docs/verification/AWCP-22.md docs/adr/ADR-009-v1-api-evolution.md docs/adr/ADR-010-optional-platform-capabilities.md docs/adr/ADR-011-gitops-ownership-boundary.md docs/adr/ADR-012-environment-delivery-model.md docs/adr/ADR-013-terraform-and-gitops-ownership.md infra/terraform/README.md infra/terraform/verify.sh infra/terraform/.terraform.lock.hcl test/fixtures/v1/v0-compatible.yaml; do
   test -s "$file"
 done
 test -x demo/portfolio-demo.sh
