@@ -14,6 +14,7 @@ import (
 func main() {
 	options := manager.Options{
 		WatchNamespace:   os.Getenv("WATCH_NAMESPACE"),
+		WatchNamespaces:  manager.ParseWatchNamespaces(os.Getenv("WATCH_NAMESPACES")),
 		ManagerNamespace: os.Getenv("MANAGER_NAMESPACE"),
 	}
 	flag.StringVar(&options.ProbeAddress, "health-probe-bind-address", ":8081", "Health/readiness address")
@@ -38,7 +39,7 @@ func main() {
 		log.Error(err, "Could not create manager")
 		os.Exit(1)
 	}
-	log.Info("Starting AWCP manager", "namespace", options.WatchNamespace)
+	log.Info("Starting AWCP manager", "namespaces", options.EffectiveWatchNamespaces())
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		log.Error(err, "Manager stopped with error")
 		os.Exit(1)

@@ -9,7 +9,7 @@ controller remains the sole writer of its owned children.
 
 | Owner | Resources / responsibility | Explicitly not owned |
 | --- | --- | --- |
-| Git + Argo CD platform Application | `config/default`: namespaces, CRD, AWCP manager, bounded RBAC and metrics Service | Argo CD installation and destructive platform prune |
+| Git + Argo CD platform Application | `config/default`: namespaces, tenant profiles/quotas/limits, CRD, AWCP manager, bounded RBAC and metrics Service | Argo CD installation and destructive platform prune |
 | Git + Argo CD ApplicationSet | Parent `AIWorkload` objects rendered from `gitops/workloads/environments/*` | Generated Deployment, Service, ServiceAccount and NetworkPolicy |
 | AWCP controller | Current-parent UID-owned workload children and status/events | Argo CD `Application`/`AppProject`, user Secrets, namespaces and shared infrastructure |
 | Cluster administrator | Argo CD bootstrap, repository policy, credential/SSO configuration, production image selection and CRD/namespace removal | Application content changes made by a workload developer |
@@ -19,12 +19,13 @@ Kubernetes owner reference to its `AIWorkload`; it is lifecycle-reconciled by AW
 not declared in an Argo source. This prevents GitOps and operator reconciliation
 from overwriting one another.
 
-`AppProject/awcp-platform` restricts the source to this public repository, the
-destination namespaces to `awcp-system` and `awcp-workloads`, and cluster-scoped
-resources to the exact Namespace, CRD and RBAC kinds required by the current
-package. It is a starting boundary, not a replacement for cluster admission/RBAC
-policy. A future environment/tenant story tightens sources and destinations rather
-than broadening a workload's authority.
+`AppProject/awcp-platform` restricts the source to this public repository and the
+explicit platform, shared-workload, and three reference tenant namespaces. Its
+cluster-scoped whitelist remains only Namespace, CRD and the metrics-auth RBAC
+kinds; tenant resources are all namespace-scoped. It is a starting boundary, not
+a replacement for cluster admission/RBAC policy. AWCP-23 keeps the manager's
+runtime scope bounded to the exact same namespace list rather than granting it a
+ClusterRole.
 
 ## Repository model
 

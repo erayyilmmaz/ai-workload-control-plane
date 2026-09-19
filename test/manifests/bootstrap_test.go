@@ -63,7 +63,7 @@ func TestManagerSecurity(t *testing.T) {
 	if len(container.Ports) != 2 || container.Ports[1].Name != "metrics" || container.Ports[1].ContainerPort != 8443 || len(container.VolumeMounts) != 1 || container.VolumeMounts[0].MountPath != "/tmp/k8s-metrics-server/serving-certs" || len(pod.Volumes) != 1 || pod.Volumes[0].EmptyDir == nil {
 		t.Fatal("secure metrics serving volume or port missing")
 	}
-	if len(container.Env) != 2 || container.Env[0].Name != "WATCH_NAMESPACE" || container.Env[0].Value != "awcp-workloads" || container.Env[1].Name != "MANAGER_NAMESPACE" || container.Env[1].ValueFrom.FieldRef.FieldPath != "metadata.namespace" {
+	if len(container.Env) != 2 || container.Env[0].Name != "WATCH_NAMESPACES" || container.Env[0].Value != "awcp-workloads,awcp-tenant-alpha,awcp-tenant-bravo,awcp-tenant-charlie" || container.Env[1].Name != "MANAGER_NAMESPACE" || container.Env[1].ValueFrom.FieldRef.FieldPath != "metadata.namespace" {
 		t.Fatal("namespace configuration drift")
 	}
 }
@@ -95,10 +95,11 @@ func TestMetricsAuthenticationRBACAndService(t *testing.T) {
 func TestGeneratedRBACAndCRD(t *testing.T) {
 	var role rbacv1.Role
 	readYAML(t, "config/rbac/role.yaml", &role)
-	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 8 {
+	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 9 {
 		t.Fatalf("unexpected runtime role: %+v", role)
 	}
 	want := map[string]string{
+		"/configmaps":                            "get",
 		"/secrets":                               "get,list,watch",
 		"/serviceaccounts":                       "create,get,list,patch,update,watch",
 		"/services":                              "create,delete,get,list,patch,update,watch",
@@ -111,7 +112,7 @@ func TestGeneratedRBACAndCRD(t *testing.T) {
 	for _, rule := range role.Rules {
 		key := strings.Join(rule.APIGroups, ",") + "/" + strings.Join(rule.Resources, ",")
 		verbs, ok := want[key]
-		if !ok || strings.Join(rule.Verbs, ",") != verbs || len(rule.ResourceNames) != 0 || len(rule.NonResourceURLs) != 0 {
+		if !ok || strings.Join(rule.Verbs, ",") != verbs || len(rule.NonResourceURLs) != 0 || (key == "/configmaps" && (len(rule.ResourceNames) != 1 || rule.ResourceNames[0] != "awcp-tenant-profile")) || (key != "/configmaps" && len(rule.ResourceNames) != 0) {
 			t.Fatalf("unexpected permissions: %+v", rule)
 		}
 		delete(want, key)

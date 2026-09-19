@@ -12,6 +12,12 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: awcp-workloads
       server: https://kubernetes.default.svc
+    - namespace: awcp-tenant-alpha
+      server: https://kubernetes.default.svc
+    - namespace: awcp-tenant-bravo
+      server: https://kubernetes.default.svc
+    - namespace: awcp-tenant-charlie
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
@@ -26,12 +32,20 @@ spec:
       kind: ServiceAccount
     - group: ""
       kind: Service
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
     - group: apps
       kind: Deployment
     - group: coordination.k8s.io
       kind: Lease
     - group: events.k8s.io
       kind: Event
+    - group: networking.k8s.io
+      kind: NetworkPolicy
     - group: platform.example.io
       kind: AIWorkload
     - group: rbac.authorization.k8s.io

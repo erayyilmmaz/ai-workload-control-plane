@@ -28,6 +28,7 @@ cleanup() {
       "$kubectl" get pods -A || true
       "$kubectl" -n awcp-system get events --sort-by=.lastTimestamp || true
       "$kubectl" -n awcp-workloads get events --sort-by=.lastTimestamp || true
+      "$kubectl" -n awcp-tenant-alpha get events --sort-by=.lastTimestamp || true
       "$kubectl" -n awcp-system logs deployment/awcp-controller-manager --all-containers || true
     fi
     "$kind" delete cluster --name "$cluster" || result=1
@@ -69,6 +70,32 @@ wait_secret_failure() {
     sleep 1
   done
   echo 'Missing Secret did not produce SecretNotFound conditions' >&2; return 1
+}
+wait_tenant_secret_failure() {
+  local state attempt
+  for attempt in $(seq 1 60); do
+    state="$("$kubectl" -n awcp-tenant-alpha get aiworkload/tenant-isolation -o json 2>/dev/null || true)"
+    if test -n "$state" && jq -e '
+      .status.observedGeneration == .metadata.generation and
+      ([.status.conditions[]? | select(.type == "TenantReady" and .status == "True" and .reason == "TenantConfigured")] | length == 1) and
+      ([.status.conditions[]? | select(.type == "Degraded" and .status == "True" and .reason == "SecretNotFound")] | length == 1)
+    ' <<<"$state" >/dev/null; then return 0; fi
+    sleep 1
+  done
+  echo 'Tenant workload did not prove local Secret isolation' >&2; return 1
+}
+wait_tenant_ready() {
+  local state attempt
+  for attempt in $(seq 1 90); do
+    state="$("$kubectl" -n awcp-tenant-alpha get aiworkload/tenant-isolation -o json 2>/dev/null || true)"
+    if test -n "$state" && jq -e '
+      .status.observedGeneration == .metadata.generation and .status.readyReplicas == 1 and
+      ([.status.conditions[]? | select(.type == "TenantReady" and .status == "True" and .reason == "TenantConfigured")] | length == 1) and
+      ([.status.conditions[]? | select(.type == "Ready" and .status == "True" and .reason == "WorkloadReady")] | length == 1)
+    ' <<<"$state" >/dev/null; then return 0; fi
+    sleep 1
+  done
+  echo 'Tenant workload did not become Ready' >&2; return 1
 }
 wait_new_uid() {
   local resource="$1" old_uid="$2" uid attempt
@@ -117,6 +144,38 @@ created=true
 make deploy DEPLOY_IMG="$manager_image"
 "$kubectl" apply -f examples/observability/metrics-reader-clusterrole.yaml
 "$kubectl" apply -f test/e2e/metrics-reader.yaml
+
+# Tenant acceptance: all resources are predeclared by config/default; AWCP only
+# watches the fixed namespaces and creates namespace-local workload children.
+for tenant in alpha bravo charlie; do
+  namespace="awcp-tenant-$tenant"
+  "$kubectl" -n "$namespace" get configmap/awcp-tenant-profile resourcequota/awcp-tenant-quota limitrange/awcp-tenant-limits >/dev/null
+done
+test "$("$kubectl" auth can-i create aiworkloads.platform.example.io --as=tenant-alpha --as-group=awcp:tenant-alpha-developers -n awcp-tenant-alpha)" = yes
+test "$("$kubectl" auth can-i get secrets --as=tenant-alpha --as-group=awcp:tenant-alpha-developers -n awcp-tenant-bravo)" = no
+test "$("$kubectl" auth can-i create aiworkloads.platform.example.io --as=tenant-alpha --as-group=awcp:tenant-alpha-developers -n awcp-tenant-bravo)" = no
+"$kubectl" -n awcp-tenant-bravo create secret generic tenant-only-secret --from-literal=marker=bravo
+"$kubectl" apply -f test/e2e/tenant-alpha-workload.yaml
+wait_tenant_secret_failure
+"$kubectl" -n awcp-tenant-alpha create secret generic tenant-only-secret --from-literal=marker=alpha
+tenant_workload=tenant-isolation
+tenant_hash="$(printf '%s' "$tenant_workload" | shasum -a 256 | awk '{print substr($1, 1, 16)}')"
+tenant_child="awcp-$tenant_workload-$tenant_hash"
+"$kubectl" -n awcp-tenant-alpha rollout status "deployment/$tenant_child" --timeout=180s
+wait_tenant_ready
+test "$("$kubectl" auth can-i get secrets --as=system:serviceaccount:awcp-tenant-alpha:"$tenant_child" -n awcp-tenant-alpha)" = no
+"$kubectl" -n awcp-tenant-alpha delete aiworkload/tenant-isolation --wait=false
+"$kubectl" -n awcp-tenant-alpha wait --for=delete aiworkload/tenant-isolation --timeout=90s
+"$kubectl" -n awcp-tenant-alpha wait --for=delete "deployment/$tenant_child" --timeout=90s
+if "$kubectl" apply -f test/e2e/tenant-limitrange-violation.yaml; then
+  echo 'LimitRange accepted a Pod over the tenant maximum' >&2; exit 1
+fi
+"$kubectl" apply -f test/e2e/tenant-quota-pod-1.yaml
+"$kubectl" apply -f test/e2e/tenant-quota-pod-2.yaml
+if "$kubectl" apply -f test/e2e/tenant-quota-pod-3.yaml; then
+  echo 'ResourceQuota accepted a third 1-CPU Pod over the small profile ceiling' >&2; exit 1
+fi
+"$kubectl" -n awcp-tenant-alpha delete pod/tenant-quota-pod-1 pod/tenant-quota-pod-2 --ignore-not-found
 demo_step 1 'create AIWorkload'
 "$kubectl" -n awcp-workloads create secret generic demo-settings --from-literal=marker=synthetic
 "$kubectl" apply -f test/e2e/demo-workload.yaml

@@ -40,7 +40,7 @@ func secretIndex(o client.Object) []string {
 
 // RequestsForSecret is payload-free and namespace-scoped, including delete events.
 func (r *AIWorkloadReconciler) RequestsForSecret(ctx context.Context, o client.Object) []ctrl.Request {
-	if o.GetNamespace() != r.WatchNamespace {
+	if !r.watchesNamespace(o.GetNamespace()) {
 		return nil
 	}
 	var parents platformv1alpha1.AIWorkloadList

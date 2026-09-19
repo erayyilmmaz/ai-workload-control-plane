@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +28,12 @@ import (
 
 // Options are explicit so out-of-cluster runs cannot silently expand scope.
 type Options struct {
-	WatchNamespace   string
+	// WatchNamespace is the V0 single-namespace spelling. It remains supported
+	// for manifests and tests that have not opted into the explicit list.
+	WatchNamespace string
+	// WatchNamespaces is a bounded, explicitly configured tenant namespace list.
+	// It must not be combined with WatchNamespace.
+	WatchNamespaces  []string
 	ManagerNamespace string
 	ProbeAddress     string
 	// MetricsBindAddress is disabled for library/tests when empty; cmd/main enables :8443.
@@ -39,15 +45,42 @@ type Options struct {
 	Builder resource.Builder
 }
 
-// Validate requires exactly one DNS-label namespace for each purpose.
+// EffectiveWatchNamespaces returns the configured bounded cache scope.
+func (o Options) EffectiveWatchNamespaces() []string {
+	if len(o.WatchNamespaces) != 0 {
+		return append([]string(nil), o.WatchNamespaces...)
+	}
+	return []string{o.WatchNamespace}
+}
+
+// ParseWatchNamespaces accepts a comma-separated environment value without
+// silently trimming malformed configuration.
+func ParseWatchNamespaces(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
+}
+
+// Validate requires one or more distinct DNS-label workload namespaces and a
+// single DNS-label manager namespace. A list is deliberately explicit: AWCP
+// never changes its cache scope from an AIWorkload object.
 func (o Options) Validate() error {
-	for name, value := range map[string]string{
-		"WATCH_NAMESPACE":   o.WatchNamespace,
-		"MANAGER_NAMESPACE": o.ManagerNamespace,
-	} {
+	if o.WatchNamespace != "" && len(o.WatchNamespaces) != 0 {
+		return errors.New("set either WATCH_NAMESPACE or WATCH_NAMESPACES, not both")
+	}
+	seen := map[string]bool{}
+	for _, value := range o.EffectiveWatchNamespaces() {
 		if problems := validation.IsDNS1123Label(value); len(problems) != 0 {
-			return fmt.Errorf("%s must be one non-empty DNS-label namespace", name)
+			return fmt.Errorf("WATCH_NAMESPACES entries must be non-empty DNS-label namespaces")
 		}
+		if seen[value] {
+			return fmt.Errorf("WATCH_NAMESPACES contains duplicate namespace %q", value)
+		}
+		seen[value] = true
+	}
+	if problems := validation.IsDNS1123Label(o.ManagerNamespace); len(problems) != 0 {
+		return fmt.Errorf("MANAGER_NAMESPACE must be one non-empty DNS-label namespace")
 	}
 	return nil
 }
@@ -59,6 +92,11 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 	}
 	if options.Builder == nil {
 		options.Builder = resource.WorkloadBuilder{}
+	}
+	watchNamespaces := options.EffectiveWatchNamespaces()
+	cacheNamespaces := make(map[string]cache.Config, len(watchNamespaces))
+	for _, namespace := range watchNamespaces {
+		cacheNamespaces[namespace] = cache.Config{}
 	}
 	metricsAddress := options.MetricsBindAddress
 	if metricsAddress == "" {
@@ -74,7 +112,7 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 	// +kubebuilder:scaffold:scheme
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                        scheme,
-		Cache:                         cache.Options{DefaultNamespaces: map[string]cache.Config{options.WatchNamespace: {}}},
+		Cache:                         cache.Options{DefaultNamespaces: cacheNamespaces},
 		Metrics:                       metricsserver.Options{BindAddress: metricsAddress, SecureServing: metricsAddress != "0", FilterProvider: filters.WithAuthenticationAndAuthorization},
 		HealthProbeBindAddress:        options.ProbeAddress,
 		LeaderElection:                options.LeaderElection,
@@ -87,7 +125,7 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 		return nil, err
 	}
 	if err = (&controller.AIWorkloadReconciler{
-		Client: mgr.GetClient(), WatchNamespace: options.WatchNamespace, Builder: options.Builder, ControllerName: options.ControllerName, Telemetry: telemetry.Default(),
+		Client: mgr.GetClient(), TenantReader: mgr.GetAPIReader(), WatchNamespaces: watchNamespaces, Builder: options.Builder, ControllerName: options.ControllerName, Telemetry: telemetry.Default(),
 	}).SetupWithManager(mgr); err != nil {
 		return nil, err
 	}
@@ -96,7 +134,7 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 	if err = mgr.Add(ready); err != nil {
 		return nil, err
 	}
-	if err = mgr.Add(&telemetry.GaugeRefresher{Reader: mgr.GetCache(), Namespace: options.WatchNamespace, Metrics: telemetry.Default()}); err != nil {
+	if err = mgr.Add(&telemetry.GaugeRefresher{Reader: mgr.GetCache(), Namespaces: watchNamespaces, Metrics: telemetry.Default()}); err != nil {
 		return nil, err
 	}
 	if err = mgr.AddHealthzCheck("process", healthz.Ping); err != nil {

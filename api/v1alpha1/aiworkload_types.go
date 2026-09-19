@@ -32,6 +32,15 @@ type AIWorkloadSpec struct {
 	// +optional
 	Environment string `json:"environment,omitempty"`
 
+	// Tenant is an optional logical tenant identity. When present, AWCP verifies it
+	// against the GitOps-managed tenant profile in this workload's namespace. It
+	// never selects another namespace or grants Kubernetes permissions.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+	// +optional
+	Tenant string `json:"tenant,omitempty"`
+
 	// Image is the container image reference. Whitespace is forbidden; registry
 	// availability and full OCI reference validity are checked at workload runtime.
 	// +kubebuilder:validation:MinLength=1

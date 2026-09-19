@@ -7,6 +7,14 @@ metadata:
 rules:
 - apiGroups:
   - ""
+  resourceNames:
+  - awcp-tenant-profile
+  resources:
+  - configmaps
+  verbs:
+  - get
+- apiGroups:
+  - ""
   resources:
   - secrets
   verbs:

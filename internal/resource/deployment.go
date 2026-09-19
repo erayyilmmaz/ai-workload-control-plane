@@ -26,6 +26,7 @@ const (
 	InstanceLabel          = "app.kubernetes.io/instance"
 	UIDLabel               = "platform.example.io/workload-uid"
 	EnvironmentLabel       = "platform.example.io/environment"
+	TenantLabel            = "platform.example.io/tenant"
 	WorkloadNameAnnotation = "platform.example.io/workload-name"
 )
 
@@ -76,6 +77,11 @@ func managedMetadata(m *metav1.ObjectMeta, p *platform.AIWorkload) {
 		m.Labels[EnvironmentLabel] = p.Spec.Environment
 	} else {
 		delete(m.Labels, EnvironmentLabel)
+	}
+	if p.Spec.Tenant != "" {
+		m.Labels[TenantLabel] = p.Spec.Tenant
+	} else {
+		delete(m.Labels, TenantLabel)
 	}
 	if m.Annotations == nil {
 		m.Annotations = map[string]string{}

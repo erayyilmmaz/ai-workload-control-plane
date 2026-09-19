@@ -44,7 +44,7 @@ func New(registerer prometheus.Registerer) (*Metrics, error) {
 			Help: "Number of failed reconciliations by fixed safe reason.",
 		}, []string{"reason"}),
 		active: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: "awcp", Subsystem: "controller", Name: "managed_workloads", Help: "Current AIWorkloads in the watched namespace.",
+			Namespace: "awcp", Subsystem: "controller", Name: "managed_workloads", Help: "Current AIWorkloads across AWCP's explicitly watched namespaces.",
 		}),
 		ready: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "awcp", Subsystem: "controller", Name: "ready_workloads", Help: "Current AIWorkloads with Ready=True.",
@@ -69,20 +69,30 @@ func (m *Metrics) RecordFailure(reason string) { m.failures.WithLabelValues(reas
 // Refresh derives gauges from cache state, so restart and deletion never depend on
 // blind increment/decrement bookkeeping.
 func (m *Metrics) Refresh(ctx context.Context, reader client.Reader, namespace string) error {
-	var workloads platformv1alpha1.AIWorkloadList
-	if err := reader.List(ctx, &workloads, client.InNamespace(namespace)); err != nil {
-		return err
-	}
+	return m.RefreshNamespaces(ctx, reader, []string{namespace})
+}
+
+// RefreshNamespaces aggregates only the manager's fixed cache namespaces. It
+// intentionally adds no tenant metric label, avoiding unbounded cardinality.
+func (m *Metrics) RefreshNamespaces(ctx context.Context, reader client.Reader, namespaces []string) error {
 	ready, degraded := 0, 0
-	for i := range workloads.Items {
-		if meta.IsStatusConditionTrue(workloads.Items[i].Status.Conditions, "Ready") {
-			ready++
+	active := 0
+	for _, namespace := range namespaces {
+		var workloads platformv1alpha1.AIWorkloadList
+		if err := reader.List(ctx, &workloads, client.InNamespace(namespace)); err != nil {
+			return err
 		}
-		if meta.IsStatusConditionTrue(workloads.Items[i].Status.Conditions, "Degraded") {
-			degraded++
+		active += len(workloads.Items)
+		for i := range workloads.Items {
+			if meta.IsStatusConditionTrue(workloads.Items[i].Status.Conditions, "Ready") {
+				ready++
+			}
+			if meta.IsStatusConditionTrue(workloads.Items[i].Status.Conditions, "Degraded") {
+				degraded++
+			}
 		}
 	}
-	m.active.Set(float64(len(workloads.Items)))
+	m.active.Set(float64(active))
 	m.ready.Set(float64(ready))
 	m.degraded.Set(float64(degraded))
 	return nil
@@ -91,10 +101,11 @@ func (m *Metrics) Refresh(ctx context.Context, reader client.Reader, namespace s
 // GaugeRefresher observes cache state out of band; its failure is logged and never
 // returned to or blocks the controller's core reconciliation path.
 type GaugeRefresher struct {
-	Reader    client.Reader
-	Namespace string
-	Metrics   *Metrics
-	Interval  time.Duration
+	Reader     client.Reader
+	Namespace  string
+	Namespaces []string
+	Metrics    *Metrics
+	Interval   time.Duration
 }
 
 func (r *GaugeRefresher) NeedLeaderElection() bool { return true }
@@ -105,7 +116,11 @@ func (r *GaugeRefresher) Start(ctx context.Context) error {
 		interval = 15 * time.Second
 	}
 	refresh := func() {
-		if err := r.Metrics.Refresh(ctx, r.Reader, r.Namespace); err != nil {
+		namespaces := r.Namespaces
+		if len(namespaces) == 0 {
+			namespaces = []string{r.Namespace}
+		}
+		if err := r.Metrics.RefreshNamespaces(ctx, r.Reader, namespaces); err != nil {
 			log.FromContext(ctx).Error(err, "Could not refresh workload telemetry gauges")
 		}
 	}

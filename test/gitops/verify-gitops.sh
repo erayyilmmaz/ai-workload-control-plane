@@ -12,6 +12,16 @@ for file in gitops/README.md gitops/argocd/bootstrap.sh gitops/argocd/installati
 done
 
 "$kustomize" build gitops/platform/base | grep -Fq 'kind: AppProject'
+platform_rendered="$("$kustomize" build config/default)"
+for tenant in alpha bravo charlie; do
+  printf '%s\n' "$platform_rendered" | grep -Fq "name: awcp-tenant-$tenant"
+done
+for kind in ConfigMap ResourceQuota LimitRange; do
+  printf '%s\n' "$platform_rendered" | grep -Fq "kind: $kind"
+done
+printf '%s\n' "$platform_rendered" | grep -Fq 'name: awcp-tenant-profile'
+printf '%s\n' "$platform_rendered" | grep -Fq 'resourceNames:'
+! rg -n '^kind: ClusterRole$|^kind: ClusterRoleBinding$' config/tenancy
 applications="$($kustomize build gitops/argocd/applications)"
 printf '%s\n' "$applications" | grep -Fq 'name: awcp-platform'
 printf '%s\n' "$applications" | grep -Fq 'kind: ApplicationSet'
@@ -35,4 +45,4 @@ grep -Fq 'version: 10.9.0' gitops/argocd/installation.lock.yaml
 grep -Fq 'apply --server-side --force-conflicts' docs/gitops.md test/e2e/gitops-e2e.sh
 grep -Fq 'create namespace argocd' test/e2e/gitops-e2e.sh
 ! rg -n -i '(password|token|clientsecret):\s*[^#[:space:]]' gitops/argocd
-echo 'PASS: GitOps environment sources are renderable, parent-only, isolated by overlay and free of committed credentials'
+echo 'PASS: GitOps sources are renderable, tenant resources are namespace-scoped, environment overlays are parent-only and sources are free of committed credentials'

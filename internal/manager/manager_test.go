@@ -24,6 +24,25 @@ func TestNamespaceValidation(t *testing.T) {
 	}
 }
 
+func TestMultipleWatchNamespacesAreExplicitAndBounded(t *testing.T) {
+	opts := Options{WatchNamespaces: []string{"awcp-workloads", "awcp-tenant-alpha"}, ManagerNamespace: "awcp-system"}
+	if err := opts.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if got := opts.EffectiveWatchNamespaces(); len(got) != 2 || got[1] != "awcp-tenant-alpha" {
+		t.Fatalf("unexpected effective namespaces: %v", got)
+	}
+	if err := (Options{WatchNamespace: "awcp-workloads", WatchNamespaces: []string{"awcp-tenant-alpha"}, ManagerNamespace: "awcp-system"}).Validate(); err == nil {
+		t.Fatal("legacy and list scopes must not be combined")
+	}
+	if err := (Options{WatchNamespaces: []string{"awcp-tenant-alpha", "awcp-tenant-alpha"}, ManagerNamespace: "awcp-system"}).Validate(); err == nil {
+		t.Fatal("duplicate tenant scopes must be rejected")
+	}
+	if got := ParseWatchNamespaces("awcp-tenant-alpha,awcp-tenant-bravo"); len(got) != 2 || got[0] != "awcp-tenant-alpha" || got[1] != "awcp-tenant-bravo" {
+		t.Fatalf("unexpected parsed namespaces: %v", got)
+	}
+}
+
 func TestReadinessRequiresStartup(t *testing.T) {
 	r := &startupReadiness{}
 	if !r.NeedLeaderElection() {

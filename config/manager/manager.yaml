@@ -41,8 +41,8 @@ spec:
             - --health-probe-bind-address=:8081
             - --metrics-bind-address=:8443
           env:
-            - name: WATCH_NAMESPACE
-              value: awcp-workloads
+            - name: WATCH_NAMESPACES
+              value: awcp-workloads,awcp-tenant-alpha,awcp-tenant-bravo,awcp-tenant-charlie
             - name: MANAGER_NAMESPACE
               valueFrom:
                 fieldRef:

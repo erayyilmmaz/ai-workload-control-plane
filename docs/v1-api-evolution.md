@@ -39,7 +39,7 @@ only in their owning story after schema, builder, status and lifecycle tests exi
 | Planned field | Owning story | Contract direction | Absent-field behavior |
 | --- | --- | --- | --- |
 | `spec.environment` | AWCP-21 | Implemented optional logical environment identity; it labels AWCP-owned children and never selects a namespace or cluster | Existing namespace/manifest behavior is unchanged |
-| `spec.tenant` | AWCP-23 | Tenant profile/name, constrained to namespace policy and labels | No new tenant object or cluster permission is inferred |
+| `spec.tenant` | AWCP-23 | Implemented optional tenant identity; it must match the namespace-local GitOps tenant profile before AWCP creates children | Omission preserves V0 behavior and does not read a tenant profile |
 | `spec.autoscaling` | AWCP-27 | HPA intent, min/max/metrics/behavior | `replicas` remains controller-owned as in V0 |
 | `spec.exposure` | AWCP-26 | ClusterLocal or external HTTPRoute intent | Existing ClusterIP Service behavior is unchanged |
 | `spec.delivery` | AWCP-29 | Rolling, Canary or BlueGreen rollout intent | Existing Deployment rolling update is retained |
@@ -73,6 +73,13 @@ dependency is healthy or manufacture a new successful state. Discovery errors ar
 transient observations (`ReconcileFailed`/backoff), not proof that a dependency is
 absent. Feature-specific status fields and condition types require their own API
 story and bounded-size review.
+
+AWCP-23 adds the bounded `TenantReady` condition only when `spec.tenant` is
+present. `TenantConfigured=True` proves that the namespace-local profile matched;
+`TenantNotConfigured`, `TenantMismatch`, and `TenantProfileInvalid` are terminal
+configuration observations. A quota rejection is reported as the retryable,
+sanitized `QuotaExceeded` reason on the existing operational conditions. Neither
+condition exposes ConfigMap, Secret, or Kubernetes API error payloads.
 
 Status never contains Secret values, credentials, raw provider errors, bearer
 tokens or unbounded revision history.

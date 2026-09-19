@@ -2,6 +2,13 @@
 
 `make e2e` is the local, single-command acceptance environment. It builds the manager and two entirely local demo images, creates an isolated random-named kind cluster with an explicit temporary kubeconfig, loads those images into its node, deploys the rendered bundle, and removes that cluster on success or failure. It never reads, changes, or deletes the user's current kube context.
 
+The same run also verifies the checked-in `small` tenant profile: a tenant-alpha
+developer can create only its namespace-local parent, a Secret only in tenant-bravo
+does not satisfy tenant-alpha, generated workload ServiceAccounts have no Secret
+read permission, a LimitRange overage is rejected at admission, and a third 1-CPU
+Pod is rejected by the 2-CPU ResourceQuota. These are kind API/RBAC/admission
+checks; a CNI-specific packet test remains outside this reference environment.
+
 ```bash
 make e2e
 ```

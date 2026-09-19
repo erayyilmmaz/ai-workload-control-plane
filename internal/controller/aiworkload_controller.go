@@ -4,11 +4,15 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/events"
 
@@ -26,12 +30,16 @@ import (
 // AIWorkloadReconciler executes pure plans; a nil Builder deliberately creates no children.
 type AIWorkloadReconciler struct {
 	client.Client
-	WatchNamespace string
-	ControllerName string
-	Scheme         *runtime.Scheme
-	Builder        resource.Builder
-	Recorder       events.EventRecorder
-	Telemetry      telemetry.Recorder
+	// TenantReader uses direct API reads for the one GitOps-owned tenant profile
+	// ConfigMap. It avoids widening the cache to arbitrary ConfigMaps.
+	TenantReader    client.Reader
+	WatchNamespace  string
+	WatchNamespaces []string
+	ControllerName  string
+	Scheme          *runtime.Scheme
+	Builder         resource.Builder
+	Recorder        events.EventRecorder
+	Telemetry       telemetry.Recorder
 }
 
 // +kubebuilder:rbac:groups=platform.example.io,namespace=awcp-workloads,resources=aiworkloads,verbs=get;list;watch
@@ -41,14 +49,15 @@ type AIWorkloadReconciler struct {
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=services,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,namespace=awcp-workloads,resources=networkpolicies,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=configmaps,resourceNames=awcp-tenant-profile,verbs=get
 // +kubebuilder:rbac:groups=events.k8s.io,namespace=awcp-workloads,resources=events,verbs=create;patch;update
 
 // Reconcile guards parent lifecycle, builds/validates a plan, then applies in dependency order.
 func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	if r.WatchNamespace == "" {
-		return ctrl.Result{}, errors.New("watch namespace is required")
+	if len(r.effectiveWatchNamespaces()) == 0 {
+		return ctrl.Result{}, errors.New("watch namespaces are required")
 	}
-	if req.Namespace != r.WatchNamespace {
+	if !r.watchesNamespace(req.Namespace) {
 		return ctrl.Result{}, nil
 	}
 	var workload platformv1alpha1.AIWorkload
@@ -59,6 +68,13 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	ctx = log.IntoContext(ctx, logger)
 	if !workload.DeletionTimestamp.IsZero() || r.Builder == nil {
 		return ctrl.Result{}, nil
+	}
+	tenantBefore := workload.DeepCopy()
+	if err := r.validateTenant(ctx, &workload); err != nil {
+		return r.reportFailure(ctx, &workload, err)
+	}
+	if _, err := r.patchStatus(ctx, tenantBefore, &workload); err != nil {
+		return r.reportFailure(ctx, &workload, err)
 	}
 	plan, err := r.Builder.Build(workload.DeepCopy())
 	if err == nil {
@@ -94,6 +110,69 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return r.reportFailure(ctx, &workload, err)
 	}
 	return ctrl.Result{}, nil
+}
+
+func (r *AIWorkloadReconciler) effectiveWatchNamespaces() []string {
+	if len(r.WatchNamespaces) != 0 {
+		return r.WatchNamespaces
+	}
+	if r.WatchNamespace == "" {
+		return nil
+	}
+	return []string{r.WatchNamespace}
+}
+
+func (r *AIWorkloadReconciler) watchesNamespace(namespace string) bool {
+	for _, watched := range r.effectiveWatchNamespaces() {
+		if namespace == watched {
+			return true
+		}
+	}
+	return false
+}
+
+const (
+	tenantProfileConfigMap = "awcp-tenant-profile"
+	conditionTenantReady   = "TenantReady"
+)
+
+type tenantConfigurationError struct {
+	reason  string
+	message string
+}
+
+func (e tenantConfigurationError) Error() string { return e.reason }
+
+// validateTenant treats a namespace-local, GitOps-owned ConfigMap as the
+// policy boundary. No AIWorkload field is ever allowed to redirect this lookup
+// into another namespace.
+func (r *AIWorkloadReconciler) validateTenant(ctx context.Context, workload *platformv1alpha1.AIWorkload) error {
+	if workload.Spec.Tenant == "" {
+		meta.RemoveStatusCondition(&workload.Status.Conditions, conditionTenantReady)
+		return nil
+	}
+	reader := r.TenantReader
+	if reader == nil {
+		reader = r.Client
+	}
+	profile := &corev1.ConfigMap{}
+	if err := reader.Get(ctx, client.ObjectKey{Namespace: workload.Namespace, Name: tenantProfileConfigMap}, profile); err != nil {
+		if apierrors.IsNotFound(err) {
+			return tenantConfigurationError{reason: "TenantNotConfigured", message: "This namespace has no GitOps-managed AWCP tenant profile."}
+		}
+		return fmt.Errorf("read tenant profile: %w", err)
+	}
+	if profile.Data["tenant"] != workload.Spec.Tenant {
+		return tenantConfigurationError{reason: "TenantMismatch", message: "spec.tenant must match the tenant profile bound to this namespace."}
+	}
+	if profile.Data["profile"] != "small" && profile.Data["profile"] != "medium" && profile.Data["profile"] != "large" {
+		return tenantConfigurationError{reason: "TenantProfileInvalid", message: "The namespace tenant profile must select small, medium, or large."}
+	}
+	meta.SetStatusCondition(&workload.Status.Conditions, metav1.Condition{
+		Type: conditionTenantReady, Status: metav1.ConditionTrue, Reason: "TenantConfigured",
+		Message: "The workload tenant matches the namespace-local GitOps profile.", ObservedGeneration: workload.Generation,
+	})
+	return nil
 }
 
 func childKind(object client.Object) string {

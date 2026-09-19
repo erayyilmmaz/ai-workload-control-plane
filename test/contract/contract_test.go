@@ -197,6 +197,19 @@ func TestAPIContract(t *testing.T) {
 			t.Fatalf("invalid environment accepted: %v", err)
 		}
 	})
+	t.Run("tenant-is-optional-namespace-bound-identity", func(t *testing.T) {
+		o := minimal("tenant")
+		set(t, o, "alpha", "spec", "tenant")
+		create(t, o)
+		get(t, o)
+		expect(t, o, "alpha", "spec", "tenant")
+
+		invalid := minimal("invalid-tenant")
+		set(t, invalid, "Tenant_Alpha", "spec", "tenant")
+		if err := api.Create(t.Context(), invalid, &client.CreateOptions{FieldValidation: "Strict"}); !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "spec.tenant") {
+			t.Fatalf("invalid tenant accepted: %v", err)
+		}
+	})
 	t.Run("invalid-fixtures", func(t *testing.T) {
 		data, err := os.ReadFile("../fixtures/invalid/index.json")
 		if err != nil {

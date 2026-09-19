@@ -53,6 +53,7 @@ func build(t *testing.T, p *platform.AIWorkload) *appsv1.Deployment {
 func TestDeploymentMapping(t *testing.T) {
 	p := source()
 	p.Spec.Environment = "staging"
+	p.Spec.Tenant = "alpha"
 	before := p.DeepCopy()
 	d := build(t, p)
 	pod := d.Spec.Template.Spec
@@ -77,6 +78,9 @@ func TestDeploymentMapping(t *testing.T) {
 		}
 		if labels[EnvironmentLabel] != "staging" {
 			t.Fatal("environment label missing")
+		}
+		if labels[TenantLabel] != "alpha" {
+			t.Fatal("tenant label missing")
 		}
 	}
 	if d.Annotations[WorkloadNameAnnotation] != p.Name || d.Spec.Template.Annotations[WorkloadNameAnnotation] != p.Name {
@@ -138,6 +142,19 @@ func TestEnvironmentLabelIsRemovedWhenOmitted(t *testing.T) {
 	}
 	if _, found := d.Labels[EnvironmentLabel]; found {
 		t.Fatal("omitted environment must not leave a stale child label")
+	}
+}
+
+func TestTenantLabelIsRemovedWhenOmitted(t *testing.T) {
+	p := source()
+	p.Spec.Tenant = "alpha"
+	d := build(t, p)
+	p.Spec.Tenant = ""
+	if err := intentFor(t, p).Mutate(d); err != nil {
+		t.Fatal(err)
+	}
+	if _, found := d.Labels[TenantLabel]; found {
+		t.Fatal("omitted tenant must not leave a stale child label")
 	}
 }
 

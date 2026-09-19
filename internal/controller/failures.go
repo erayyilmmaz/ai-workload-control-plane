@@ -4,6 +4,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -75,6 +76,16 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 		message = "One or more referenced Secrets are unavailable in the workload namespace."
 		permanent = true
 	}
+	var tenantErr tenantConfigurationError
+	if errors.As(cause, &tenantErr) {
+		reason = tenantErr.reason
+		message = tenantErr.message
+		permanent = true
+	}
+	if apierrors.IsForbidden(cause) && strings.Contains(strings.ToLower(cause.Error()), "exceeded quota") {
+		reason = "QuotaExceeded"
+		message = "Tenant quota blocked an AWCP child; reduce requested resources or ask a platform administrator to adjust the tenant profile."
+	}
 	before := p.DeepCopy()
 	if apierrors.IsNotFound(cause) {
 		// A missing observed child has no ready replicas; never preserve a stale
@@ -90,6 +101,9 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 			value = metav1.ConditionTrue
 		}
 		meta.SetStatusCondition(&p.Status.Conditions, metav1.Condition{Type: typ, Status: value, Reason: reason, Message: message, ObservedGeneration: p.Generation})
+	}
+	if errors.As(cause, &tenantErr) {
+		meta.SetStatusCondition(&p.Status.Conditions, metav1.Condition{Type: conditionTenantReady, Status: metav1.ConditionFalse, Reason: reason, Message: message, ObservedGeneration: p.Generation})
 	}
 	p.Status.ObservedGeneration = p.Generation
 	p.Status.DesiredReplicas = desiredReplicas(p)
@@ -143,7 +157,7 @@ func (r *AIWorkloadReconciler) patchStatus(ctx context.Context, before, after *p
 func preserveUnmanagedConditions(desired, current []metav1.Condition) []metav1.Condition {
 	result := append([]metav1.Condition(nil), desired...)
 	for _, condition := range current {
-		if condition.Type == conditionReady || condition.Type == conditionProgressing || condition.Type == conditionDegraded {
+		if condition.Type == conditionReady || condition.Type == conditionProgressing || condition.Type == conditionDegraded || condition.Type == conditionTenantReady {
 			continue
 		}
 		if meta.FindStatusCondition(result, condition.Type) == nil {

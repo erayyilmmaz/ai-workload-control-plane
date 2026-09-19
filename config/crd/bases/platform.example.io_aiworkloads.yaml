@@ -217,6 +217,15 @@ spec:
                     minimum: 1
                     type: integer
                 type: object
+              tenant:
+                description: |-
+                  Tenant is an optional logical tenant identity. When present, AWCP verifies it
+                  against the GitOps-managed tenant profile in this workload's namespace. It
+                  never selects another namespace or grants Kubernetes permissions.
+                maxLength: 63
+                minLength: 1
+                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                type: string
             required:
             - container
             - image

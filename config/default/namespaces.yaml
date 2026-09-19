@@ -10,3 +10,35 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: awcp-workloads
+  labels:
+    platform.example.io/tenant-mode: shared-v0
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: awcp-tenant-alpha
+  labels:
+    platform.example.io/tenant: alpha
+    platform.example.io/quota-profile: small
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: awcp-tenant-bravo
+  labels:
+    platform.example.io/tenant: bravo
+    platform.example.io/quota-profile: medium
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: awcp-tenant-charlie
+  labels:
+    platform.example.io/tenant: charlie
+    platform.example.io/quota-profile: large
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.36
