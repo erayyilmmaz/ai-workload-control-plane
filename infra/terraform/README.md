@@ -42,8 +42,10 @@ make infra-verify
 ```
 
 `terraform init -backend=false -lockfile=readonly` must succeed against the
-committed `.terraform.lock.hcl`. A provider/version change is intentional only
-when the lock file changes in the same review.
+committed `.terraform.lock.hcl`. Its AWS provider checksums cover the supported
+macOS ARM64 developer and Linux AMD64 CI platforms. A provider/version or
+supported-platform change is intentional only when the lock file changes in the
+same review.
 
 ## Authorized apply handoff (not executed by this repository)
 

@@ -25,10 +25,10 @@ terraform validate                              PASS
 trivy config HIGH,CRITICAL                      PASS (0 findings)
 ```
 
-The first provider initialization created the committed `.terraform.lock.hcl`.
-Subsequent verification is lockfile-readonly. This evidence does not claim AWS
-credentials, a remote backend, `terraform plan`, `terraform apply`, EKS creation,
-Argo bootstrap or a production deployment.
+The committed provider lock includes the supported macOS ARM64 and Linux AMD64
+package checksums; subsequent verification is lockfile-readonly. This evidence
+does not claim AWS credentials, a remote backend, `terraform plan`,
+`terraform apply`, EKS creation, Argo bootstrap or a production deployment.
 
 ## Boundaries and next handoff
 
