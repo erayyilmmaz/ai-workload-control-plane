@@ -97,6 +97,22 @@ wait_tenant_ready() {
   done
   echo 'Tenant workload did not become Ready' >&2; return 1
 }
+wait_tenant_quota_released() {
+  local pods quota attempt
+  for attempt in $(seq 1 90); do
+    pods="$("$kubectl" -n awcp-tenant-alpha get pods -o json 2>/dev/null || true)"
+    quota="$("$kubectl" -n awcp-tenant-alpha get resourcequota/awcp-tenant-quota -o json 2>/dev/null || true)"
+    if test -n "$pods" && test -n "$quota" && jq -e '
+      [.items[] | select(.metadata.deletionTimestamp == null)] | length == 0
+    ' <<<"$pods" >/dev/null && jq -e '
+      (.status.used."requests.cpu" // "0") == "0" and
+      (.status.used."limits.cpu" // "0") == "0" and
+      (.status.used.pods // "0") == "0"
+    ' <<<"$quota" >/dev/null; then return 0; fi
+    sleep 1
+  done
+  echo 'Tenant workload quota usage was not released before quota admission test' >&2; return 1
+}
 wait_new_uid() {
   local resource="$1" old_uid="$2" uid attempt
   for attempt in $(seq 1 90); do
@@ -170,6 +186,7 @@ test "$("$kubectl" auth can-i get secrets --as=system:serviceaccount:awcp-tenant
 "$kubectl" -n awcp-tenant-alpha delete aiworkload/tenant-isolation --wait=false
 "$kubectl" -n awcp-tenant-alpha wait --for=delete aiworkload/tenant-isolation --timeout=90s
 "$kubectl" -n awcp-tenant-alpha wait --for=delete "deployment/$tenant_child" --timeout=90s
+wait_tenant_quota_released
 if "$kubectl" apply -f test/e2e/tenant-limitrange-violation.yaml; then
   echo 'LimitRange accepted a Pod over the tenant maximum' >&2; exit 1
 fi
