@@ -36,4 +36,13 @@ This reference does not manage Kubernetes manifests or AWCP workloads. Terraform
 owns infrastructure; Git/Argo owns parent manifests; AWCP owns child resources.
 Production state, network path to a private API, EKS access entries, node pools,
 workload identity and cloud-account cost approval remain external, authorized
-steps. GitHub CI evidence is recorded separately after the pushed commit run.
+steps.
+
+## Hosted CI evidence
+
+GitHub Actions run
+[35441831583](https://github.com/erayyilmmaz/ai-workload-control-plane/actions/runs/35441831583)
+completed successfully for commit
+`ce4c668d27388c2ee2fdded211f876be291d5399` on 2026-09-19. All 12 jobs passed,
+including Linux AMD64 `infra-validate`, envtest and the disposable kind E2E job.
+This is hosted CI evidence only; it does not create or alter cloud infrastructure.
