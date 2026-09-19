@@ -1,13 +1,12 @@
 apiVersion: platform.example.io/v1alpha1
 kind: AIWorkload
 metadata:
-  name: tenant-isolation
+  name: tenant-policy-violation
   namespace: awcp-tenant-alpha
 spec:
   tenant: alpha
-  policy: restricted
+  policy: baseline
   image: awcp-demo:v1
-  replicas: 1
   container:
     port: 8080
   resources:
@@ -17,5 +16,5 @@ spec:
     limits:
       cpu: 500m
       memory: 512Mi
-  secretRefs:
-    - tenant-only-secret
+  network:
+    enabled: true

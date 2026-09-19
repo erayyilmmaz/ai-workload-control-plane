@@ -154,6 +154,9 @@ done
 test "$("$kubectl" auth can-i create aiworkloads.platform.example.io --as=tenant-alpha --as-group=awcp:tenant-alpha-developers -n awcp-tenant-alpha)" = yes
 test "$("$kubectl" auth can-i get secrets --as=tenant-alpha --as-group=awcp:tenant-alpha-developers -n awcp-tenant-bravo)" = no
 test "$("$kubectl" auth can-i create aiworkloads.platform.example.io --as=tenant-alpha --as-group=awcp:tenant-alpha-developers -n awcp-tenant-bravo)" = no
+if "$kubectl" apply -f test/e2e/tenant-policy-violation.yaml; then
+  echo 'Restricted policy accepted a workload selecting baseline' >&2; exit 1
+fi
 "$kubectl" -n awcp-tenant-bravo create secret generic tenant-only-secret --from-literal=marker=bravo
 "$kubectl" apply -f test/e2e/tenant-alpha-workload.yaml
 wait_tenant_secret_failure

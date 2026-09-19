@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - namespaces.yaml
   - ../tenancy
+  - ../policy
   - ../crd
   - ../rbac
   - ../manager

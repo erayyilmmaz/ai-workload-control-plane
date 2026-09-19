@@ -21,6 +21,11 @@ for kind in ConfigMap ResourceQuota LimitRange; do
 done
 [[ "$platform_rendered" == *'name: awcp-tenant-profile'* ]]
 [[ "$platform_rendered" == *'resourceNames:'* ]]
+[[ "$platform_rendered" == *'kind: ValidatingAdmissionPolicy'* ]]
+[[ "$platform_rendered" == *'kind: ValidatingAdmissionPolicyBinding'* ]]
+[[ "$platform_rendered" == *'validationActions:'* ]]
+grep -Fq 'kind: ValidatingAdmissionPolicy' gitops/platform/base/project.yaml
+grep -Fq 'kind: ValidatingAdmissionPolicyBinding' gitops/platform/base/project.yaml
 ! rg -n '^kind: ClusterRole$|^kind: ClusterRoleBinding$' config/tenancy
 applications="$($kustomize build gitops/argocd/applications)"
 printf '%s\n' "$applications" | grep -Fq 'name: awcp-platform'

@@ -20,6 +20,7 @@ metadata:
   labels:
     platform.example.io/tenant: alpha
     platform.example.io/quota-profile: small
+    platform.example.io/policy-profile: restricted
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: v1.36
 ---
@@ -30,6 +31,7 @@ metadata:
   labels:
     platform.example.io/tenant: bravo
     platform.example.io/quota-profile: medium
+    platform.example.io/policy-profile: restricted
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: v1.36
 ---
@@ -40,5 +42,6 @@ metadata:
   labels:
     platform.example.io/tenant: charlie
     platform.example.io/quota-profile: large
+    platform.example.io/policy-profile: restricted
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/enforce-version: v1.36

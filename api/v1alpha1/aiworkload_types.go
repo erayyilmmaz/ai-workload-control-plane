@@ -41,6 +41,14 @@ type AIWorkloadSpec struct {
 	// +optional
 	Tenant string `json:"tenant,omitempty"`
 
+	// Policy selects a platform-defined admission profile. It is declarative
+	// intent, never a CEL expression or a way to bypass namespace policy. The
+	// restricted profile is enforced only in namespaces selected by the GitOps
+	// ValidatingAdmissionPolicyBinding; omission preserves V0 behavior elsewhere.
+	// +kubebuilder:validation:Enum=baseline;restricted
+	// +optional
+	Policy string `json:"policy,omitempty"`
+
 	// Image is the container image reference. Whitespace is forbidden; registry
 	// availability and full OCI reference validity are checked at workload runtime.
 	// +kubebuilder:validation:MinLength=1

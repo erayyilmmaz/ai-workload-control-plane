@@ -11,12 +11,12 @@ import (
 
 func TestExplicitZeroFalseSerialization(t *testing.T) {
 	zero, disabled := int32(0), false
-	spec := AIWorkloadSpec{Image: "example.invalid/app:v1", Container: ContainerSpec{Port: 8080}, Replicas: &zero, Service: &ServiceSpec{Enabled: &disabled}, Network: &NetworkSpec{Enabled: &disabled}}
+	spec := AIWorkloadSpec{Image: "example.invalid/app:v1", Container: ContainerSpec{Port: 8080}, Replicas: &zero, Service: &ServiceSpec{Enabled: &disabled}, Network: &NetworkSpec{Enabled: &disabled}, Policy: "restricted"}
 	data, err := json.Marshal(spec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{`"replicas":0`, `"enabled":false`} {
+	for _, field := range []string{`"replicas":0`, `"enabled":false`, `"policy":"restricted"`} {
 		if !strings.Contains(string(data), field) {
 			t.Fatalf("lost explicit value %s in %s", field, data)
 		}
@@ -25,7 +25,7 @@ func TestExplicitZeroFalseSerialization(t *testing.T) {
 	if err = json.Unmarshal(data, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	if decoded.Replicas == nil || *decoded.Replicas != 0 || decoded.Service.Enabled == nil || *decoded.Service.Enabled || decoded.Network.Enabled == nil || *decoded.Network.Enabled {
+	if decoded.Replicas == nil || *decoded.Replicas != 0 || decoded.Service.Enabled == nil || *decoded.Service.Enabled || decoded.Network.Enabled == nil || *decoded.Network.Enabled || decoded.Policy != "restricted" {
 		t.Fatal("zero/false round-trip failed")
 	}
 }

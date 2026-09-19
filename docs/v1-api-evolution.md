@@ -45,9 +45,9 @@ only in their owning story after schema, builder, status and lifecycle tests exi
 | `spec.delivery` | AWCP-29 | Rolling, Canary or BlueGreen rollout intent | Existing Deployment rolling update is retained |
 | `spec.externalSecrets` | AWCP-25 | Namespaced SecretStore/ExternalSecret references without values | Existing `secretRefs` semantics are retained |
 | `spec.availability` | AWCP-28 | Workload PDB intent | No PDB is created |
-| `spec.policy` | AWCP-24 | Selection of platform policy profile, never arbitrary CEL | No admission policy is created or bypassed |
+| `spec.policy` | AWCP-24 | Implemented optional `baseline` or `restricted` platform profile; never arbitrary CEL | Omission preserves V0 behavior outside a namespace selected by a policy binding |
 
-`environment` and `tenant` remain declarative identity, not authority. GitOps
+`environment`, `tenant`, and `policy` remain declarative identity, not authority. GitOps
 placement, namespace creation, AppProject/RBAC, quota and policy binding belong to
 their platform stories. A workload cannot choose a broader namespace, Gateway,
 SecretStore or permission by supplying one of these fields.

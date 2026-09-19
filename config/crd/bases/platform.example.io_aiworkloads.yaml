@@ -127,6 +127,16 @@ spec:
                       workload's generated policy.
                     type: boolean
                 type: object
+              policy:
+                description: |-
+                  Policy selects a platform-defined admission profile. It is declarative
+                  intent, never a CEL expression or a way to bypass namespace policy. The
+                  restricted profile is enforced only in namespaces selected by the GitOps
+                  ValidatingAdmissionPolicyBinding; omission preserves V0 behavior elsewhere.
+                enum:
+                - baseline
+                - restricted
+                type: string
               replicas:
                 default: 1
                 description: Replicas is the desired count; zero intentionally scales

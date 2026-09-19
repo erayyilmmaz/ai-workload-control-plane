@@ -210,6 +210,20 @@ func TestAPIContract(t *testing.T) {
 			t.Fatalf("invalid tenant accepted: %v", err)
 		}
 	})
+	t.Run("policy-is-an-optional-platform-profile", func(t *testing.T) {
+		for _, profile := range []string{"baseline", "restricted"} {
+			o := minimal("policy-" + profile)
+			set(t, o, profile, "spec", "policy")
+			create(t, o)
+			get(t, o)
+			expect(t, o, profile, "spec", "policy")
+		}
+		invalid := minimal("invalid-policy")
+		set(t, invalid, "user-supplied-cel", "spec", "policy")
+		if err := api.Create(t.Context(), invalid, &client.CreateOptions{FieldValidation: "Strict"}); !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "spec.policy") {
+			t.Fatalf("invalid policy profile accepted: %v", err)
+		}
+	})
 	t.Run("invalid-fixtures", func(t *testing.T) {
 		data, err := os.ReadFile("../fixtures/invalid/index.json")
 		if err != nil {

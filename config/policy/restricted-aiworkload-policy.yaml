@@ -1,0 +1,39 @@
+# GitOps owns this cluster-scoped admission boundary. The AWCP manager does not
+# create, modify, or need RBAC for either object.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: awcp-restricted-aiworkload.platform.example.io
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [platform.example.io]
+        apiVersions: [v1alpha1]
+        operations: [CREATE, UPDATE]
+        resources: [aiworkloads]
+  validations:
+    - expression: "has(object.spec.policy) && object.spec.policy == 'restricted'"
+      message: "restricted tenant namespaces require spec.policy: restricted"
+      reason: Invalid
+    - expression: "has(object.spec.tenant) && object.spec.tenant != ''"
+      message: "restricted tenant namespaces require a tenant identity"
+      reason: Invalid
+    - expression: "has(object.spec.resources) && has(object.spec.resources.requests) && has(object.spec.resources.limits) && 'cpu' in object.spec.resources.requests && 'memory' in object.spec.resources.requests && 'cpu' in object.spec.resources.limits && 'memory' in object.spec.resources.limits"
+      message: "restricted tenant namespaces require CPU and memory requests and limits"
+      reason: Invalid
+    - expression: "has(object.spec.network) && object.spec.network.enabled == true"
+      message: "restricted tenant namespaces require network.enabled: true"
+      reason: Invalid
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: awcp-restricted-aiworkload.platform.example.io
+spec:
+  policyName: awcp-restricted-aiworkload.platform.example.io
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        platform.example.io/policy-profile: restricted

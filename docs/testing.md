@@ -7,9 +7,9 @@ rollout.
 | Layer | Command | Proves | Does not prove |
 | --- | --- | --- | --- |
 | Unit | `make test-unit` | Pure builders, names, status reduction, ownership guards and races | API-server defaulting, watches or Kubernetes garbage collection |
-| Envtest | `make test-envtest` | CRD/default/CEL behavior, API reads/writes, watches, manager lifecycle and deletion guard | Scheduler, kubelet, traffic, CNI enforcement or garbage collection |
+| Envtest | `make test-envtest` | CRD/default/CEL behavior, real ValidatingAdmissionPolicy deny/allow behavior, API reads/writes, watches, manager lifecycle and deletion guard | Scheduler, kubelet, traffic, CNI enforcement or garbage collection |
 | Kind smoke | `make docker-build && make smoke` | Container/runtime contract, manager startup, RBAC, foundational owned-tree garbage collection and Secret survival | Application readiness, HTTP traffic, CNI enforcement or HA failover |
-| Kind E2E | `make e2e` | Real scheduler/kubelet rollout, Service HTTP traffic, image update, scale, all-child drift, Secret recovery, restart recovery, authenticated metrics, tenant Role isolation, namespace-local Secret lookup, LimitRange admission and ResourceQuota admission | Production CNI packet enforcement, published-image install or HA failover |
+| Kind E2E | `make e2e` | Real scheduler/kubelet rollout, Service HTTP traffic, image update, scale, all-child drift, Secret recovery, restart recovery, authenticated metrics, tenant Role isolation, namespace-local Secret lookup, LimitRange/ResourceQuota admission and restricted tenant-policy denial | Production CNI packet enforcement, published-image install or HA failover |
 
 ## Regression commands
 
