@@ -69,6 +69,7 @@ reference while preserving GitOps ownership of platform and workload manifests.
 | V1-04 | AWCP-22 | Terraform reference infrastructure | Pinned Terraform/provider lock, static validation and high/critical IaC scan without cloud credentials | AWCP-20, 21 |
 | V1-05 | AWCP-23 | Tenant model, namespaces, ResourceQuota and LimitRange | Tenant namespace, quota/range and least-privilege Role reconciliation in envtest and kind | AWCP-19 |
 | V1-06 | AWCP-24 | Fixed policy profile and ValidatingAdmissionPolicy | Real API admission deny/allow contract and kind restricted-policy denial | AWCP-19, 23 |
+| V1-07 | AWCP-25 | External Secrets integration and target rotation | ESO v1 namespace-bound references, metadata-only rollout trigger and hosted kind proof | AWCP-19, 23 |
 
 Each behavior gets relevant tests while it is implemented. AWCP-13 consolidates regression coverage; it does not postpone all tests until the end. Status logic introduced early may use temporary fixtures until the full lifecycle is available.
 

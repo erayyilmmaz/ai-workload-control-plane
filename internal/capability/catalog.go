@@ -3,7 +3,12 @@
 // manager startup depend on any optional API or controller.
 package capability
 
-import "context"
+import (
+	"context"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/client-go/discovery"
+)
 
 // Feature names one V1 feature family that can require a platform capability.
 // These strings are API/status reasons only after the owning feature story wires
@@ -113,6 +118,29 @@ const (
 // discovery request or gain broad dependency ownership.
 type ResourceLookup interface {
 	HasResource(context.Context, APIResource) (bool, error)
+}
+
+// DiscoveryLookup adapts Kubernetes discovery without preloading optional APIs
+// at manager startup. It is intentionally read-only and does not grant a
+// feature permission to create the discovered resource.
+type DiscoveryLookup struct {
+	Discovery discovery.DiscoveryInterface
+}
+
+func (l DiscoveryLookup) HasResource(_ context.Context, resource APIResource) (bool, error) {
+	list, err := l.Discovery.ServerResourcesForGroupVersion(resource.GroupVersion)
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	for _, apiResource := range list.APIResources {
+		if resource.Resource == "*" || apiResource.Name == resource.Resource {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Observation is the sanitized result for one optional feature. Error is kept

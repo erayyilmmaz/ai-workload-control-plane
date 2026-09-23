@@ -12,6 +12,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -21,6 +22,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	platformv1alpha1 "github.com/erayyilmmaz/ai-workload-control-plane/api/v1alpha1"
+	"github.com/erayyilmmaz/ai-workload-control-plane/internal/capability"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/controller"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/resource"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/telemetry"
@@ -124,8 +126,12 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
 	if err = (&controller.AIWorkloadReconciler{
-		Client: mgr.GetClient(), TenantReader: mgr.GetAPIReader(), WatchNamespaces: watchNamespaces, Builder: options.Builder, ControllerName: options.ControllerName, Telemetry: telemetry.Default(),
+		Client: mgr.GetClient(), TenantReader: mgr.GetAPIReader(), ExternalSecretsReader: mgr.GetAPIReader(), CapabilityLookup: capability.DiscoveryLookup{Discovery: discoveryClient}, WatchNamespaces: watchNamespaces, Builder: options.Builder, ControllerName: options.ControllerName, Telemetry: telemetry.Default(),
 	}).SetupWithManager(mgr); err != nil {
 		return nil, err
 	}

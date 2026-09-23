@@ -71,8 +71,9 @@ bundle. See the installation guide.
 
 ## Limitations
 
-- Alpha API; no tenant isolation, egress isolation, Secret rotation or CNI
-  enforcement guarantee.
+- Alpha API; no egress isolation or CNI enforcement guarantee. Direct
+  `secretRefs` rotation remains unsupported; AWCP-25 proves only ESO target
+  metadata-driven Deployment rollout.
 - No claim of SBOM, signing, provenance or container scan unless linked here.
 ```
 

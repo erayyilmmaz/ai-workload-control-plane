@@ -152,6 +152,52 @@ assert_metrics() {
   stop_port_forward; echo 'Authenticated metrics did not converge' >&2; return 1
 }
 
+install_external_secrets_operator() {
+  local lock="test/e2e/external-secrets.lock.json" bundle expected actual url deployment
+  bundle="$scratch/external-secrets.yaml"
+  url="$(jq -er '.url' "$lock")"
+  expected="$(jq -er '.sha256' "$lock")"
+  curl --fail --silent --show-error --location "$url" -o "$bundle"
+  actual="$(shasum -a 256 "$bundle" | awk '{print $1}')"
+  test "$actual" = "$expected" || { echo 'External Secrets Operator manifest checksum mismatch' >&2; return 1; }
+  "$kubectl" apply --server-side --force-conflicts -f "$bundle"
+  for deployment in external-secrets external-secrets-webhook external-secrets-cert-controller; do
+    "$kubectl" -n default rollout status "deployment/$deployment" --timeout=240s
+  done
+}
+
+wait_external_secret_ready() {
+  local attempt state
+  for attempt in $(seq 1 90); do
+    state="$("$kubectl" -n awcp-workloads get externalsecret/awcp-e2e-settings-sync -o json 2>/dev/null || true)"
+    if test -n "$state" && jq -e '
+      [.status.conditions[]? | select(.type == "Ready" and .status == "True")] | length == 1
+    ' <<<"$state" >/dev/null; then return 0; fi
+    sleep 1
+  done
+  echo 'ExternalSecret did not become Ready' >&2; return 1
+}
+
+wait_resource_version_change() {
+  local resource="$1" old="$2" current attempt
+  for attempt in $(seq 1 90); do
+    current="$("$kubectl" -n awcp-workloads get "$resource" -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || true)"
+    if test -n "$current" && test "$current" != "$old"; then return 0; fi
+    sleep 1
+  done
+  echo "$resource resourceVersion did not change" >&2; return 1
+}
+
+wait_external_secret_rollout() {
+  local deployment="$1" old="$2" current attempt
+  for attempt in $(seq 1 90); do
+    current="$("$kubectl" -n awcp-workloads get "deployment/$deployment" -o jsonpath='{.spec.template.metadata.annotations.platform\.example\.io/external-secret-revision}' 2>/dev/null || true)"
+    if test -n "$current" && test "$current" != "$old"; then return 0; fi
+    sleep 1
+  done
+  echo 'AWCP did not roll out after ExternalSecret target metadata changed' >&2; return 1
+}
+
 if "$kind" get clusters | grep -Fxq "$cluster"; then echo 'Refusing to reuse an existing cluster' >&2; exit 1; fi
 for image in "$manager_image" "$demo_v1" "$demo_v2"; do test "$(docker image inspect "$image" --format '{{.Config.User}}')" = '65532:65532'; done
 created=true
@@ -160,6 +206,32 @@ created=true
 make deploy DEPLOY_IMG="$manager_image"
 "$kubectl" apply -f examples/observability/metrics-reader-clusterrole.yaml
 "$kubectl" apply -f test/e2e/metrics-reader.yaml
+
+# AWCP-25: execute the checksum-verified official ESO manifest on this disposable
+# kind cluster, then prove provider sync and target metadata rotation without
+# printing or reading Secret data.
+install_external_secrets_operator
+"$kubectl" apply -f test/e2e/external-secret-store.yaml
+"$kubectl" -n awcp-workloads wait --for=condition=Ready secretstore/awcp-e2e-fake-store --timeout=120s
+"$kubectl" -n awcp-workloads wait --for=create secret/awcp-e2e-settings --timeout=120s
+wait_external_secret_ready
+"$kubectl" apply -f test/e2e/external-secret-workload.yaml
+external_workload=external-secret-rotation
+external_hash="$(printf '%s' "$external_workload" | shasum -a 256 | awk '{print substr($1, 1, 16)}')"
+external_child="awcp-$external_workload-$external_hash"
+"$kubectl" -n awcp-workloads rollout status "deployment/$external_child" --timeout=180s
+external_secret_rv="$("$kubectl" -n awcp-workloads get secret/awcp-e2e-settings -o jsonpath='{.metadata.resourceVersion}')"
+external_revision="$("$kubectl" -n awcp-workloads get "deployment/$external_child" -o jsonpath='{.spec.template.metadata.annotations.platform\.example\.io/external-secret-revision}')"
+test -n "$external_revision"
+"$kubectl" -n awcp-workloads patch externalsecret/awcp-e2e-settings-sync --type=json -p='[{"op":"replace","path":"/spec/data/0/remoteRef/version","value":"v2"}]'
+wait_resource_version_change secret/awcp-e2e-settings "$external_secret_rv"
+wait_external_secret_ready
+wait_external_secret_rollout "$external_child" "$external_revision"
+"$kubectl" -n awcp-workloads rollout status "deployment/$external_child" --timeout=180s
+"$kubectl" -n awcp-workloads delete aiworkload/external-secret-rotation --wait=false
+"$kubectl" -n awcp-workloads wait --for=delete aiworkload/external-secret-rotation --timeout=90s
+"$kubectl" -n awcp-workloads wait --for=delete "deployment/$external_child" --timeout=90s
+"$kubectl" -n awcp-workloads get externalsecret/awcp-e2e-settings-sync secret/awcp-e2e-settings >/dev/null
 
 # Tenant acceptance: all resources are predeclared by config/default; AWCP only
 # watches the fixed namespaces and creates namespace-local workload children.

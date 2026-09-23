@@ -28,6 +28,7 @@ One served/storage version and the `/status` subresource are implemented. No con
 | spec.service.enabled | Default true; explicit false is preserved even with defaulted siblings |
 | spec.service.port | Default 80, range 1..65535; ClusterIP TCP only, targetPort `http` |
 | spec.secretRefs | Default empty ordered list, at most 32 unique Secret DNS-subdomain names of 1..253 characters, from the CR namespace |
+| spec.externalSecrets | Optional ordered list of at most 16 unique `{externalSecret, targetSecret}` DNS-subdomain pairs. Both names are namespace-local ESO references; neither is a provider value or remote key. |
 | spec.network.enabled | Default true; same-namespace ingress to container TCP port; no egress isolation |
 
 Resource quantities must be parseable and non-negative. CEL `isQuantity`, `quantity`
@@ -61,9 +62,9 @@ The pod runs under its generated ServiceAccount with automountServiceAccountToke
 
 ## Secret and network semantics
 
-Secret references map to non-optional `envFrom.secretRef`. Preserve list order; later references take precedence for overlapping keys. Key compatibility and whether values are valid for the application remain application concerns. The controller does not copy Secret data, hash payloads into annotations, or create a Secret.
+Direct Secret references map to non-optional `envFrom.secretRef`. `externalSecrets` appends each validated ESO target after direct references, preserving its declared order. The controller requires ESO v1, a Ready namespaced `SecretStore`, a Ready `ExternalSecret`, an exact target-name match and target Secret metadata; it never creates these ESO resources, reads provider data, copies Secret data or accepts `ClusterSecretStore`. Key compatibility and whether values are valid for the application remain application concerns.
 
-Deleting a Secret makes the desired contract unmet even if existing pods still hold environment values. Recreating it triggers a new observation through the reference index/watch. Updating data does not automatically restart or refresh an existing process. V0 is not a credential revocation mechanism.
+Deleting a Secret makes the desired contract unmet even if existing pods still hold environment values. Recreating it triggers a new observation through the reference index/watch. Direct `secretRefs` updates do not restart a process. For an `externalSecrets` target only, a changed Secret metadata resourceVersion is hashed into the owned Pod-template annotation and therefore triggers a normal Deployment rollout without hashing or exposing Secret payload. This detects ESO target updates, not credential validity or revocation.
 
 The generated NetworkPolicy has policyTypes=[Ingress], selects only the CR UID/name labels, and permits same-namespace pods (`podSelector: {}` within an ingress peer) to the container's TCP port. It contains no Egress policy type. Other Kubernetes policies remain additive; disabling this policy does not remove other restrictions. Cluster CNI enforcement is an external prerequisite for traffic isolation claims.
 

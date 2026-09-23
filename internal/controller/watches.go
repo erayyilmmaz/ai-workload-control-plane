@@ -27,12 +27,18 @@ func secretIndex(o client.Object) []string {
 	if !ok {
 		return nil
 	}
-	keys := make([]string, 0, len(p.Spec.SecretRefs))
+	keys := make([]string, 0, len(p.Spec.SecretRefs)+len(p.Spec.ExternalSecrets))
 	seen := map[string]bool{}
 	for _, name := range p.Spec.SecretRefs {
 		if name != "" && !seen[string(name)] {
 			keys = append(keys, string(name))
 			seen[string(name)] = true
+		}
+	}
+	for _, reference := range p.Spec.ExternalSecrets {
+		if reference.TargetSecret != "" && !seen[string(reference.TargetSecret)] {
+			keys = append(keys, string(reference.TargetSecret))
+			seen[string(reference.TargetSecret)] = true
 		}
 	}
 	return keys

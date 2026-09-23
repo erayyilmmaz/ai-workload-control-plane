@@ -64,6 +64,13 @@ rules:
   - patch
   - update
 - apiGroups:
+  - external-secrets.io
+  resources:
+  - externalsecrets
+  - secretstores
+  verbs:
+  - get
+- apiGroups:
   - networking.k8s.io
   resources:
   - networkpolicies

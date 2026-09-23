@@ -90,6 +90,19 @@ type AIWorkloadSpec struct {
 	// +optional
 	SecretRefs []SecretReference `json:"secretRefs,omitempty"`
 
+	// ExternalSecrets names namespace-local External Secrets Operator resources and
+	// their expected target Secrets. AWCP never receives provider credentials,
+	// remote values or a cross-namespace reference. The referenced ExternalSecret
+	// must use a namespaced SecretStore and report Ready before AWCP starts Pods.
+	// A target Secret metadata revision triggers an AWCP rollout without reading
+	// Secret data.
+	// +kubebuilder:validation:MaxItems=16
+	// +kubebuilder:validation:XValidation:rule="self.all(x, self.filter(y, y.externalSecret == x.externalSecret).size() == 1)",message="externalSecrets must not contain duplicate externalSecret names"
+	// +kubebuilder:validation:XValidation:rule="self.all(x, self.filter(y, y.targetSecret == x.targetSecret).size() == 1)",message="externalSecrets must not contain duplicate targetSecret names"
+	// +listType=atomic
+	// +optional
+	ExternalSecrets []ExternalSecretReference `json:"externalSecrets,omitempty"`
+
 	// Network enables same-namespace ingress policy generation; it does not isolate egress.
 	// +kubebuilder:default={}
 	// +optional
@@ -166,6 +179,19 @@ type ServiceSpec struct {
 // +kubebuilder:validation:MaxLength=253
 // +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
 type SecretReference string
+
+// ExternalSecretReference names an existing External Secrets Operator
+// ExternalSecret and the Secret it is expected to maintain in this namespace.
+// Neither field contains a provider value, credential or remote secret key.
+type ExternalSecretReference struct {
+	// ExternalSecret is the namespace-local ESO ExternalSecret resource name.
+	// +required
+	ExternalSecret SecretReference `json:"externalSecret"`
+	// TargetSecret is the namespace-local Kubernetes Secret expected from that
+	// ExternalSecret. It is injected after direct secretRefs in deterministic order.
+	// +required
+	TargetSecret SecretReference `json:"targetSecret"`
+}
 
 // NetworkSpec controls only the generated ingress policy. CNI enforcement is external.
 type NetworkSpec struct {

@@ -75,6 +75,51 @@ spec:
                 minLength: 1
                 pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                 type: string
+              externalSecrets:
+                description: |-
+                  ExternalSecrets names namespace-local External Secrets Operator resources and
+                  their expected target Secrets. AWCP never receives provider credentials,
+                  remote values or a cross-namespace reference. The referenced ExternalSecret
+                  must use a namespaced SecretStore and report Ready before AWCP starts Pods.
+                  A target Secret metadata revision triggers an AWCP rollout without reading
+                  Secret data.
+                items:
+                  description: |-
+                    ExternalSecretReference names an existing External Secrets Operator
+                    ExternalSecret and the Secret it is expected to maintain in this namespace.
+                    Neither field contains a provider value, credential or remote secret key.
+                  properties:
+                    externalSecret:
+                      description: ExternalSecret is the namespace-local ESO ExternalSecret
+                        resource name.
+                      maxLength: 253
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                      type: string
+                    targetSecret:
+                      description: |-
+                        TargetSecret is the namespace-local Kubernetes Secret expected from that
+                        ExternalSecret. It is injected after direct secretRefs in deterministic order.
+                      maxLength: 253
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                      type: string
+                  required:
+                  - externalSecret
+                  - targetSecret
+                  type: object
+                maxItems: 16
+                type: array
+                x-kubernetes-list-type: atomic
+                x-kubernetes-validations:
+                - message: externalSecrets must not contain duplicate externalSecret
+                    names
+                  rule: self.all(x, self.filter(y, y.externalSecret == x.externalSecret).size()
+                    == 1)
+                - message: externalSecrets must not contain duplicate targetSecret
+                    names
+                  rule: self.all(x, self.filter(y, y.targetSecret == x.targetSecret).size()
+                    == 1)
               health:
                 description: Health enables only explicitly present readiness/liveness
                   HTTP probe blocks.

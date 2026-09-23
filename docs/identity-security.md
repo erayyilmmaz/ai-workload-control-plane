@@ -30,10 +30,14 @@ namespace via `spec.secretRefs`; restoring the same name re-evaluates the condit
 without changing the parent. Forbidden, timeout and other API errors remain their
 own retry categories and are never mislabeled as `SecretNotFound`.
 
-Secret deletion does not revoke values already loaded into a process environment,
-and Secret data updates do not restart existing Pods. Automatic credential rotation
-is outside V0. Endpoint discovery is independent of Secret readiness; it is not an
-application health claim.
+Secret deletion does not revoke values already loaded into a process environment.
+Direct `secretRefs` data updates do not restart existing Pods. AWCP-25 adds a
+separate, opt-in ESO path: `spec.externalSecrets` references a Ready namespaced
+`SecretStore`/`ExternalSecret` pair and target Secret, then uses only the target
+metadata resourceVersion to roll the owned Deployment. AWCP does not create ESO
+objects, read provider credentials or Secret values, and rejects ClusterSecretStore.
+Endpoint discovery is independent of Secret readiness; it is not an application
+health claim.
 
 ## Operator checks
 

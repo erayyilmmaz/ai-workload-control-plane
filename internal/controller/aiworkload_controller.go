@@ -3,6 +3,8 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -23,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	platformv1alpha1 "github.com/erayyilmmaz/ai-workload-control-plane/api/v1alpha1"
+	"github.com/erayyilmmaz/ai-workload-control-plane/internal/capability"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/resource"
 	"github.com/erayyilmmaz/ai-workload-control-plane/internal/telemetry"
 )
@@ -32,14 +35,18 @@ type AIWorkloadReconciler struct {
 	client.Client
 	// TenantReader uses direct API reads for the one GitOps-owned tenant profile
 	// ConfigMap. It avoids widening the cache to arbitrary ConfigMaps.
-	TenantReader    client.Reader
-	WatchNamespace  string
-	WatchNamespaces []string
-	ControllerName  string
-	Scheme          *runtime.Scheme
-	Builder         resource.Builder
-	Recorder        events.EventRecorder
-	Telemetry       telemetry.Recorder
+	TenantReader client.Reader
+	// ExternalSecretsReader performs narrow direct reads of optional ESO objects;
+	// it is not a provider client and never reads Secret data.
+	ExternalSecretsReader client.Reader
+	CapabilityLookup      capability.ResourceLookup
+	WatchNamespace        string
+	WatchNamespaces       []string
+	ControllerName        string
+	Scheme                *runtime.Scheme
+	Builder               resource.Builder
+	Recorder              events.EventRecorder
+	Telemetry             telemetry.Recorder
 }
 
 // +kubebuilder:rbac:groups=platform.example.io,namespace=awcp-workloads,resources=aiworkloads,verbs=get;list;watch
@@ -50,6 +57,7 @@ type AIWorkloadReconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,namespace=awcp-workloads,resources=networkpolicies,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=configmaps,resourceNames=awcp-tenant-profile,verbs=get
+// +kubebuilder:rbac:groups=external-secrets.io,namespace=awcp-workloads,resources=externalsecrets;secretstores,verbs=get
 // +kubebuilder:rbac:groups=events.k8s.io,namespace=awcp-workloads,resources=events,verbs=create;patch;update
 
 // Reconcile guards parent lifecycle, builds/validates a plan, then applies in dependency order.
@@ -76,9 +84,24 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if _, err := r.patchStatus(ctx, tenantBefore, &workload); err != nil {
 		return r.reportFailure(ctx, &workload, err)
 	}
-	plan, err := r.Builder.Build(workload.DeepCopy())
+	externalBefore := workload.DeepCopy()
+	external, err := r.validateExternalSecrets(ctx, &workload)
+	if err != nil {
+		return r.reportFailure(ctx, &workload, err)
+	}
+	if _, err := r.patchStatus(ctx, externalBefore, &workload); err != nil {
+		return r.reportFailure(ctx, &workload, err)
+	}
+	desired := workload.DeepCopy()
+	for _, reference := range external {
+		desired.Spec.SecretRefs = append(desired.Spec.SecretRefs, reference.targetSecret)
+	}
+	plan, err := r.Builder.Build(desired)
 	if err == nil {
 		plan, err = ValidatePlan(&workload, plan)
+	}
+	if err == nil {
+		plan = decorateExternalSecretRevision(plan, externalSecretRevision(external))
 	}
 	if err == nil {
 		engine := Engine{Client: r.Client, Scheme: r.Scheme}
@@ -110,6 +133,20 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return r.reportFailure(ctx, &workload, err)
 	}
 	return ctrl.Result{}, nil
+}
+
+func externalSecretRevision(references []resolvedExternalSecret) string {
+	if len(references) == 0 {
+		return ""
+	}
+	hash := sha256.New()
+	for _, reference := range references {
+		_, _ = hash.Write([]byte(reference.targetSecret))
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write([]byte(reference.resourceVersion))
+		_, _ = hash.Write([]byte{0})
+	}
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 func (r *AIWorkloadReconciler) effectiveWatchNamespaces() []string {

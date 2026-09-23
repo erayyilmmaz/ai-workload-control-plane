@@ -224,6 +224,25 @@ func TestAPIContract(t *testing.T) {
 			t.Fatalf("invalid policy profile accepted: %v", err)
 		}
 	})
+	t.Run("external-secrets-are-optional-namespaced-references", func(t *testing.T) {
+		o := minimal("external-secrets")
+		set(t, o, []any{map[string]any{"externalSecret": "app-settings-sync", "targetSecret": "app-settings"}}, "spec", "externalSecrets")
+		create(t, o)
+		get(t, o)
+		references, found, err := unstructured.NestedSlice(o.Object, "spec", "externalSecrets")
+		if err != nil || !found || len(references) != 1 || references[0].(map[string]any)["externalSecret"] != "app-settings-sync" {
+			t.Fatalf("externalSecrets round-trip = %#v found=%v err=%v", references, found, err)
+		}
+
+		invalid := minimal("duplicate-external-target")
+		set(t, invalid, []any{
+			map[string]any{"externalSecret": "first-sync", "targetSecret": "settings"},
+			map[string]any{"externalSecret": "second-sync", "targetSecret": "settings"},
+		}, "spec", "externalSecrets")
+		if err := api.Create(t.Context(), invalid, &client.CreateOptions{FieldValidation: "Strict"}); !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "spec.externalSecrets") {
+			t.Fatalf("duplicate ExternalSecret target accepted: %v", err)
+		}
+	})
 	t.Run("invalid-fixtures", func(t *testing.T) {
 		data, err := os.ReadFile("../fixtures/invalid/index.json")
 		if err != nil {
@@ -346,7 +365,7 @@ func TestAPIContract(t *testing.T) {
 			return string(out)
 		}
 		out := run("explain", "aiworkload.spec", "--api-version=platform.example.io/v1alpha1")
-		for _, field := range []string{"image", "replicas", "container", "resources", "health", "service", "secretRefs", "network"} {
+		for _, field := range []string{"image", "replicas", "container", "resources", "health", "service", "secretRefs", "externalSecrets", "network"} {
 			if !strings.Contains(out, field) {
 				t.Fatalf("missing explain field %s: %s", field, out)
 			}

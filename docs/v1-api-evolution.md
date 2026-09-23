@@ -43,7 +43,7 @@ only in their owning story after schema, builder, status and lifecycle tests exi
 | `spec.autoscaling` | AWCP-27 | HPA intent, min/max/metrics/behavior | `replicas` remains controller-owned as in V0 |
 | `spec.exposure` | AWCP-26 | ClusterLocal or external HTTPRoute intent | Existing ClusterIP Service behavior is unchanged |
 | `spec.delivery` | AWCP-29 | Rolling, Canary or BlueGreen rollout intent | Existing Deployment rolling update is retained |
-| `spec.externalSecrets` | AWCP-25 | Namespaced SecretStore/ExternalSecret references without values | Existing `secretRefs` semantics are retained |
+| `spec.externalSecrets` | AWCP-25 | Implemented namespace-local `{externalSecret,targetSecret}` ESO references without values; only Ready SecretStore/ExternalSecret targets are consumed | Existing direct `secretRefs` semantics are retained |
 | `spec.availability` | AWCP-28 | Workload PDB intent | No PDB is created |
 | `spec.policy` | AWCP-24 | Implemented optional `baseline` or `restricted` platform profile; never arbitrary CEL | Omission preserves V0 behavior outside a namespace selected by a policy binding |
 
@@ -114,7 +114,7 @@ publication.
 | V0 AIWorkload API | Real envtest and kind evidence on Kubernetes 1.36.x | Existing pinned 1.36.2 envtest / 1.36.4 kind node | The only runtime baseline proven by this story |
 | ValidatingAdmissionPolicy | Design and manifest compatibility decision | Kubernetes 1.30+; stable API | AWCP-24 installs/tests policy later |
 | Gateway API HTTPRoute | Design only | Gateway API v1 CRDs plus a platform Gateway implementation | AWCP-26 owns route implementation and traffic proof |
-| External Secrets | Design only | ESO v1 CRDs/controller and namespace-local store policy | AWCP-25 owns provider/rotation proof |
+| External Secrets | Namespaced ESO v1 contract and kind proof | ESO v2.11.0 test install; Ready SecretStore/ExternalSecret and target Secret metadata | AWCP-25 proves target rotation rollout, not provider credential validity |
 | Argo Rollouts | Design only | Rollouts CRD/controller | AWCP-29 owns progressive delivery proof |
 | HPA scale-to-zero | Design only | Kubernetes 1.37+, object or external metric; 1.36 baseline cannot claim it | AWCP-27 owns rebaseline and E2E proof |
 | Prometheus, OTel, OpenCost | Optional integration design only | Independently installed/configured platform dependency | AWCP-31/32 own dashboard, alert and cost evidence |
