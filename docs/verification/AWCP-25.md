@@ -23,5 +23,16 @@
 | `make verify` + package checks | passed | Build, vet, lint, generated artifacts, docs, GitOps, bundle and Terraform static validation |
 | `make e2e` | environment gate | Docker daemon socket (`~/.docker/run/docker.sock`) was unavailable, so no local kind or ESO runtime result is claimed |
 
-Hosted CI and its checksum-verified ESO kind E2E result are recorded after the
-implementation commit is pushed.
+## Hosted evidence
+
+[CI run 35923923816](https://github.com/erayyilmmaz/ai-workload-control-plane/actions/runs/35923923816)
+passed all 12 jobs for implementation commit `760496b`.
+
+Its kind E2E job installed the checksum-pinned ESO v2.11.0 manifest, observed a
+Ready namespaced `SecretStore`, observed the ESO target Secret, changed the
+fixture's provider version from v1 to v2, observed a target metadata revision
+change and then observed the AWCP-owned Deployment complete a new rollout. The
+same run deletes the AIWorkload and confirms that the GitOps-owned ESO
+`ExternalSecret` and target Secret remain; AWCP did not claim ownership of
+either object. This is a synthetic fake-provider proof only, not a production
+credential-provider or secret-revocation validation.
