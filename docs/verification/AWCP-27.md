@@ -23,3 +23,12 @@
 | `make e2e` | environment gate | Local Docker daemon is unavailable; no local kind HPA result is claimed |
 
 Hosted CI evidence is added after the implementation commit is pushed.
+
+## Hosted evidence
+
+[GitHub Actions run 36134253689](https://github.com/erayyilmmaz/ai-workload-control-plane/actions/runs/36134253689)
+passed all 12 jobs for commit `d14ec3d`, including Linux AMD64 kind E2E. The
+hosted E2E protects the existing workload lifecycle while the HPA contract is
+validated through generated-manifest, unit and envtest gates. It does not claim
+metric-adapter-backed HPA scale-up/down or scale-to-zero, which remain explicit
+platform/rebaseline gates.
