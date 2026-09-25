@@ -53,11 +53,12 @@ watch: clusters without Gateway API must still start and reconcile V0 workloads.
 ## Runtime proof
 
 The disposable kind E2E verifies the SHA-256-pinned Envoy Gateway v1.9.1
-manifest, waits for the platform Gateway to be Programmed, creates an AWCP route,
-waits for `Accepted` and `ResolvedRefs`, sends HTTP traffic through the Envoy
-Gateway Service with the configured Host header, and confirms that deleting the
-AIWorkload garbage-collects only its HTTPRoute while preserving the Gateway.
-It is a local/reference proof, not production DNS, TLS, load-balancer or
+manifest, uses an EnvoyProxy `ClusterIP` Service because kind has no
+LoadBalancer controller, waits for the platform Gateway to be Programmed, creates
+an AWCP route, waits for `Accepted` and `ResolvedRefs`, sends HTTP traffic through
+the Envoy Gateway Service with the configured Host header, and confirms that
+deleting the AIWorkload garbage-collects only its HTTPRoute while preserving the
+Gateway. It is a local/reference proof, not production DNS, TLS, load-balancer or
 platform-network-policy evidence.
 
 References: [Gateway API HTTPRoute](https://gateway-api.sigs.k8s.io/reference/api-types/httproute/),

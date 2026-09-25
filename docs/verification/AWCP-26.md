@@ -24,3 +24,9 @@
 
 Hosted CI and its disposable kind HTTPRoute traffic result are recorded after the
 implementation commit is pushed.
+
+The first hosted run identified a reference-environment issue rather than an AWCP
+controller failure: Envoy Gateway's default `LoadBalancer` Service cannot receive
+an address on plain kind, so the Gateway stayed `Programmed=False`. The E2E fixture
+now uses the documented EnvoyProxy `ClusterIP` Service override and re-runs the
+same Gateway/route/traffic proof.
