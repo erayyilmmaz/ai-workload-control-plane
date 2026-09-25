@@ -64,6 +64,12 @@ type AIWorkloadSpec struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
+	// Autoscaling optionally delegates Deployment replica changes to one owned
+	// autoscaling/v2 HorizontalPodAutoscaler. When enabled, replicas is an initial
+	// bootstrap value only and AWCP never fights the HPA scale subresource.
+	// +optional
+	Autoscaling *AutoscalingSpec `json:"autoscaling,omitempty"`
+
 	// Container declares the required HTTP TCP port, named http in generated Pods.
 	// +required
 	Container ContainerSpec `json:"container"`
@@ -178,6 +184,74 @@ type ServiceSpec struct {
 	// +kubebuilder:validation:Maximum=65535
 	// +optional
 	Port *int32 `json:"port,omitempty"`
+}
+
+// AutoscalingMetricType bounds supported HPA metric sources to resource, Pods,
+// or external metrics. Arbitrary adapter URLs and cross-namespace references are
+// intentionally outside the workload API.
+// +kubebuilder:validation:Enum=CPU;Memory;Pods;External
+type AutoscalingMetricType string
+
+const (
+	AutoscalingCPU      AutoscalingMetricType = "CPU"
+	AutoscalingMemory   AutoscalingMetricType = "Memory"
+	AutoscalingPods     AutoscalingMetricType = "Pods"
+	AutoscalingExternal AutoscalingMetricType = "External"
+)
+
+// AutoscalingSpec is a deliberately bounded autoscaling/v2 HPA contract. The
+// current Kubernetes 1.36 runtime baseline does not claim native scale-to-zero,
+// so minReplicas is intentionally at least one in this V1 story.
+// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || !self.enabled || (has(self.minReplicas) && has(self.maxReplicas) && self.metrics.size() > 0)",message="enabled autoscaling requires minReplicas, maxReplicas and at least one metric"
+// +kubebuilder:validation:XValidation:rule="!has(self.minReplicas) || !has(self.maxReplicas) || self.minReplicas <= self.maxReplicas",message="minReplicas must not exceed maxReplicas"
+type AutoscalingSpec struct {
+	// Enabled defaults to false; omission preserves V0 static replica behavior.
+	// +kubebuilder:default=false
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// MinReplicas is the HPA lower bound. Zero is deferred until a Kubernetes 1.37
+	// feature-gate and object/external-metric capability story is proven.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=20
+	// +optional
+	MinReplicas *int32 `json:"minReplicas,omitempty"`
+	// MaxReplicas is the HPA upper bound.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=20
+	// +optional
+	MaxReplicas *int32 `json:"maxReplicas,omitempty"`
+	// Metrics is an atomic, bounded list because HPA evaluates all configured
+	// metrics and uses the largest recommendation.
+	// +kubebuilder:validation:MaxItems=4
+	// +listType=atomic
+	// +optional
+	Metrics []AutoscalingMetricSpec `json:"metrics,omitempty"`
+	// ScaleDownStabilizationSeconds optionally sets the HPA scale-down window.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=3600
+	// +optional
+	ScaleDownStabilizationSeconds *int32 `json:"scaleDownStabilizationSeconds,omitempty"`
+}
+
+// AutoscalingMetricSpec represents exactly one safe HPA metric declaration.
+// CPU and Memory use targetUtilization; Pods and External use metricName and a
+// non-negative targetValue. The adapter itself remains platform-managed.
+// +kubebuilder:validation:XValidation:rule="(self.type == 'CPU' || self.type == 'Memory') ? has(self.targetUtilization) && !has(self.metricName) && !has(self.targetValue) : has(self.metricName) && has(self.targetValue) && !has(self.targetUtilization)",message="CPU/Memory require targetUtilization; Pods/External require metricName and targetValue"
+type AutoscalingMetricSpec struct {
+	// +required
+	Type AutoscalingMetricType `json:"type"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	// +optional
+	TargetUtilization *int32 `json:"targetUtilization,omitempty"`
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern="^[a-zA-Z][a-zA-Z0-9_.-]*$"
+	// +optional
+	MetricName string `json:"metricName,omitempty"`
+	// +optional
+	TargetValue *ResourceQuantity `json:"targetValue,omitempty"`
 }
 
 // ExposureMode bounds the V1 traffic surface to the existing ClusterIP Service

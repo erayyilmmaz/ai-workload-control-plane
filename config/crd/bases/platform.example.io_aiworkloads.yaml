@@ -52,6 +52,101 @@ spec:
           spec:
             description: spec defines the desired state of AIWorkload
             properties:
+              autoscaling:
+                description: |-
+                  Autoscaling optionally delegates Deployment replica changes to one owned
+                  autoscaling/v2 HorizontalPodAutoscaler. When enabled, replicas is an initial
+                  bootstrap value only and AWCP never fights the HPA scale subresource.
+                properties:
+                  enabled:
+                    default: false
+                    description: Enabled defaults to false; omission preserves V0
+                      static replica behavior.
+                    type: boolean
+                  maxReplicas:
+                    description: MaxReplicas is the HPA upper bound.
+                    format: int32
+                    maximum: 20
+                    minimum: 1
+                    type: integer
+                  metrics:
+                    description: |-
+                      Metrics is an atomic, bounded list because HPA evaluates all configured
+                      metrics and uses the largest recommendation.
+                    items:
+                      description: |-
+                        AutoscalingMetricSpec represents exactly one safe HPA metric declaration.
+                        CPU and Memory use targetUtilization; Pods and External use metricName and a
+                        non-negative targetValue. The adapter itself remains platform-managed.
+                      properties:
+                        metricName:
+                          maxLength: 253
+                          minLength: 1
+                          pattern: ^[a-zA-Z][a-zA-Z0-9_.-]*$
+                          type: string
+                        targetUtilization:
+                          format: int32
+                          maximum: 100
+                          minimum: 1
+                          type: integer
+                        targetValue:
+                          description: ResourceQuantity is a quoted Kubernetes quantity,
+                            e.g. 100m or 128Mi.
+                          maxLength: 64
+                          minLength: 1
+                          type: string
+                          x-kubernetes-validations:
+                          - message: quantity must be parseable and non-negative
+                            rule: isQuantity(self) && !quantity(self).isLessThan(quantity('0'))
+                        type:
+                          description: |-
+                            AutoscalingMetricType bounds supported HPA metric sources to resource, Pods,
+                            or external metrics. Arbitrary adapter URLs and cross-namespace references are
+                            intentionally outside the workload API.
+                          enum:
+                          - CPU
+                          - Memory
+                          - Pods
+                          - External
+                          type: string
+                      required:
+                      - type
+                      type: object
+                      x-kubernetes-validations:
+                      - message: CPU/Memory require targetUtilization; Pods/External
+                          require metricName and targetValue
+                        rule: '(self.type == ''CPU'' || self.type == ''Memory'') ?
+                          has(self.targetUtilization) && !has(self.metricName) &&
+                          !has(self.targetValue) : has(self.metricName) && has(self.targetValue)
+                          && !has(self.targetUtilization)'
+                    maxItems: 4
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  minReplicas:
+                    default: 1
+                    description: |-
+                      MinReplicas is the HPA lower bound. Zero is deferred until a Kubernetes 1.37
+                      feature-gate and object/external-metric capability story is proven.
+                    format: int32
+                    maximum: 20
+                    minimum: 1
+                    type: integer
+                  scaleDownStabilizationSeconds:
+                    description: ScaleDownStabilizationSeconds optionally sets the
+                      HPA scale-down window.
+                    format: int32
+                    maximum: 3600
+                    minimum: 0
+                    type: integer
+                type: object
+                x-kubernetes-validations:
+                - message: enabled autoscaling requires minReplicas, maxReplicas and
+                    at least one metric
+                  rule: '!has(self.enabled) || !self.enabled || (has(self.minReplicas)
+                    && has(self.maxReplicas) && self.metrics.size() > 0)'
+                - message: minReplicas must not exceed maxReplicas
+                  rule: '!has(self.minReplicas) || !has(self.maxReplicas) || self.minReplicas
+                    <= self.maxReplicas'
               container:
                 description: Container declares the required HTTP TCP port, named
                   http in generated Pods.

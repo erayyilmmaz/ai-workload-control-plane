@@ -55,7 +55,11 @@ func (WorkloadBuilder) Build(p *platform.AIWorkload) ([]Intent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []Intent{identity, deployment, service, networkPolicyIntent(desired)}, nil
+	autoscaling, err := autoscalingIntent(desired)
+	if err != nil {
+		return nil, err
+	}
+	return []Intent{identity, deployment, service, networkPolicyIntent(desired), autoscaling}, nil
 }
 
 // SelectorLabels returns fresh stable identity labels, independent of generation/image.
@@ -104,7 +108,14 @@ func mutateDeployment(d *appsv1.Deployment, p *platform.AIWorkload, requests, li
 	d.Spec.Selector = &metav1.LabelSelector{MatchLabels: selector}
 	managedMetadata(&d.ObjectMeta, p)
 	managedMetadata(&d.Spec.Template.ObjectMeta, p)
-	d.Spec.Replicas = ptr.To(ptr.Deref(p.Spec.Replicas, 1))
+	// HPA writes Deployment.spec.replicas through the scale subresource. Preserve
+	// a live value so AWCP never reverts an autoscaler decision; on first create,
+	// initialize at the declared HPA lower bound.
+	if !AutoscalingEnabled(p) {
+		d.Spec.Replicas = ptr.To(ptr.Deref(p.Spec.Replicas, 1))
+	} else if d.ResourceVersion == "" && d.UID == "" {
+		d.Spec.Replicas = ptr.To(ptr.Deref(p.Spec.Autoscaling.MinReplicas, 1))
+	}
 	d.Spec.Strategy = appsv1.DeploymentStrategy{Type: appsv1.RollingUpdateDeploymentStrategyType, RollingUpdate: &appsv1.RollingUpdateDeployment{MaxUnavailable: ptr.To(intstr.FromInt32(0)), MaxSurge: ptr.To(intstr.FromInt32(1))}}
 	d.Spec.MinReadySeconds = 0
 	d.Spec.ProgressDeadlineSeconds = ptr.To(int32(120))

@@ -271,6 +271,25 @@ func TestAPIContract(t *testing.T) {
 			}
 		}
 	})
+	t.Run("autoscaling-is-an-optional-bounded-hpa-contract", func(t *testing.T) {
+		o := minimal("cpu-autoscaling")
+		set(t, o, map[string]any{"enabled": true, "minReplicas": int64(2), "maxReplicas": int64(10), "metrics": []any{map[string]any{"type": "CPU", "targetUtilization": int64(70)}}, "scaleDownStabilizationSeconds": int64(120)}, "spec", "autoscaling")
+		create(t, o)
+		get(t, o)
+		expect(t, o, true, "spec", "autoscaling", "enabled")
+		expect(t, o, int64(10), "spec", "autoscaling", "maxReplicas")
+		for name, autoscaling := range map[string]map[string]any{
+			"autoscaling-min-zero":             {"enabled": true, "minReplicas": int64(0), "maxReplicas": int64(3), "metrics": []any{map[string]any{"type": "CPU", "targetUtilization": int64(70)}}},
+			"autoscaling-min-over-max":         {"enabled": true, "minReplicas": int64(4), "maxReplicas": int64(3), "metrics": []any{map[string]any{"type": "CPU", "targetUtilization": int64(70)}}},
+			"autoscaling-resource-as-external": {"enabled": true, "minReplicas": int64(1), "maxReplicas": int64(3), "metrics": []any{map[string]any{"type": "External", "targetUtilization": int64(70)}}},
+		} {
+			invalid := minimal(name)
+			set(t, invalid, autoscaling, "spec", "autoscaling")
+			if err := api.Create(t.Context(), invalid, &client.CreateOptions{FieldValidation: "Strict"}); !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "spec.autoscaling") {
+				t.Fatalf("invalid autoscaling %q accepted: %v", name, err)
+			}
+		}
+	})
 	t.Run("invalid-fixtures", func(t *testing.T) {
 		data, err := os.ReadFile("../fixtures/invalid/index.json")
 		if err != nil {
@@ -393,7 +412,7 @@ func TestAPIContract(t *testing.T) {
 			return string(out)
 		}
 		out := run("explain", "aiworkload.spec", "--api-version=platform.example.io/v1alpha1")
-		for _, field := range []string{"image", "replicas", "container", "resources", "health", "service", "secretRefs", "externalSecrets", "network"} {
+		for _, field := range []string{"image", "replicas", "autoscaling", "container", "resources", "health", "service", "secretRefs", "externalSecrets", "network"} {
 			if !strings.Contains(out, field) {
 				t.Fatalf("missing explain field %s: %s", field, out)
 			}

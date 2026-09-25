@@ -95,6 +95,7 @@ alpha. A minimal runnable local example is [`examples/basic.yaml`](examples/basi
 | Concern | V0 behavior |
 | --- | --- |
 | Image and replicas | Required image; replicas default to 1 and allow 0..20 |
+| Autoscaling | Optional bounded `autoscaling/v2` HPA; enabled HPA owns live replica changes |
 | HTTP | Required container port; optional `/ready` and `/health` probes |
 | Service | Optional TCP ClusterIP Service; enabled by default |
 | Exposure | Optional same-namespace Gateway API HTTPRoute to the owned Service; no Gateway, DNS or TLS ownership |
@@ -103,7 +104,7 @@ alpha. A minimal runnable local example is [`examples/basic.yaml`](examples/basi
 | Status | Generation, replica observations, endpoint and Ready/Progressing/Degraded conditions |
 
 The detailed field contract and validation boundaries are in
-[API contract](docs/api-contract.md). Read [HTTPRoute exposure](docs/exposure.md)
+[API contract](docs/api-contract.md). Read [autoscaling](docs/autoscaling.md) and [HTTPRoute exposure](docs/exposure.md)
 before enabling external routing; it requires an administrator-provided Gateway
 and disables AWCP's default same-namespace NetworkPolicy.
 
@@ -195,7 +196,7 @@ least privilege, GitOps delivery and Terraform/IaC separation.
 
 - Alpha portfolio project, not a production-ready platform or tenant boundary.
 - No GPU scheduling, inference serving, LLM gateway/model routing, agent runtime,
-  database, broker, cloud identity, HPA, webhook or multi-cluster runtime layer.
+  database, broker, cloud identity, webhook or multi-cluster runtime layer.
 - GitOps and AWS/EKS Terraform are reference/validation assets only: no private
   repository, remote Terraform state, cloud apply, node pool, production Argo
   bootstrap, signing or production-cluster evidence exists.
@@ -204,6 +205,8 @@ least privilege, GitOps delivery and Terraform/IaC separation.
 - HTTPRoute is an opt-in reference integration. Gateway ownership, external DNS,
   TLS, load-balancer provisioning and Gateway-to-workload network policy remain
   platform responsibilities.
+- HPA object lifecycle is included, but the local baseline does not install a
+  metrics adapter and rejects scale-to-zero until a Kubernetes 1.37 rebaseline.
 - No automatic Secret rotation/revocation for an already running process.
 - No published manager image, tag, GitHub Release, SBOM, signing or provenance yet.
 

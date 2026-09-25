@@ -95,7 +95,7 @@ func TestMetricsAuthenticationRBACAndService(t *testing.T) {
 func TestGeneratedRBACAndCRD(t *testing.T) {
 	var role rbacv1.Role
 	readYAML(t, "config/rbac/role.yaml", &role)
-	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 12 {
+	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 13 {
 		t.Fatalf("unexpected runtime role: %+v", role)
 	}
 	want := map[string]string{
@@ -107,6 +107,7 @@ func TestGeneratedRBACAndCRD(t *testing.T) {
 		"/serviceaccounts":                                 "create,get,list,patch,update,watch",
 		"/services":                                        "create,delete,get,list,patch,update,watch",
 		"apps/deployments":                                 "create,get,list,patch,update,watch",
+		"autoscaling/horizontalpodautoscalers":             "create,delete,get,list,patch,update,watch",
 		"networking.k8s.io/networkpolicies":                "create,delete,get,list,patch,update,watch",
 		"events.k8s.io/events":                             "create,patch,update",
 		"platform.example.io/aiworkloads":                  "get,list,watch",

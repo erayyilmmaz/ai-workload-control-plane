@@ -40,7 +40,7 @@ only in their owning story after schema, builder, status and lifecycle tests exi
 | --- | --- | --- | --- |
 | `spec.environment` | AWCP-21 | Implemented optional logical environment identity; it labels AWCP-owned children and never selects a namespace or cluster | Existing namespace/manifest behavior is unchanged |
 | `spec.tenant` | AWCP-23 | Implemented optional tenant identity; it must match the namespace-local GitOps tenant profile before AWCP creates children | Omission preserves V0 behavior and does not read a tenant profile |
-| `spec.autoscaling` | AWCP-27 | HPA intent, min/max/metrics/behavior | `replicas` remains controller-owned as in V0 |
+| `spec.autoscaling` | AWCP-27 | Implemented HPA intent, min/max/metrics/scale-down behavior and status boundary | V0 static replicas remain the default; enabled HPA owns live Deployment scale |
 | `spec.exposure` | AWCP-26 | Implemented `ClusterLocal` or namespace-local HTTPRoute intent with exact Gateway listener/hostname/path | Existing ClusterIP Service behavior is unchanged |
 | `spec.delivery` | AWCP-29 | Rolling, Canary or BlueGreen rollout intent | Existing Deployment rolling update is retained |
 | `spec.externalSecrets` | AWCP-25 | Implemented namespace-local `{externalSecret,targetSecret}` ESO references without values; only Ready SecretStore/ExternalSecret targets are consumed | Existing direct `secretRefs` semantics are retained |

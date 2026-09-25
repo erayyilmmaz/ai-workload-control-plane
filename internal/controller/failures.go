@@ -175,7 +175,7 @@ func (r *AIWorkloadReconciler) patchStatus(ctx context.Context, before, after *p
 func preserveUnmanagedConditions(desired, current []metav1.Condition) []metav1.Condition {
 	result := append([]metav1.Condition(nil), desired...)
 	for _, condition := range current {
-		if condition.Type == conditionReady || condition.Type == conditionProgressing || condition.Type == conditionDegraded || condition.Type == conditionTenantReady || condition.Type == conditionExternalSecretsReady || condition.Type == conditionExposureReady {
+		if condition.Type == conditionReady || condition.Type == conditionProgressing || condition.Type == conditionDegraded || condition.Type == conditionTenantReady || condition.Type == conditionExternalSecretsReady || condition.Type == conditionExposureReady || condition.Type == conditionAutoscalingReady {
 			continue
 		}
 		if meta.FindStatusCondition(result, condition.Type) == nil {

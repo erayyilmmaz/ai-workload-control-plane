@@ -10,6 +10,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -58,6 +59,7 @@ type AIWorkloadReconciler struct {
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=serviceaccounts,verbs=get;list;watch;create;patch;update
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=services,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,namespace=awcp-workloads,resources=networkpolicies,verbs=get;list;watch;create;patch;update;delete
+// +kubebuilder:rbac:groups=autoscaling,namespace=awcp-workloads,resources=horizontalpodautoscalers,verbs=get;list;watch;create;patch;update;delete
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=configmaps,resourceNames=awcp-tenant-profile,verbs=get
 // +kubebuilder:rbac:groups=external-secrets.io,namespace=awcp-workloads,resources=externalsecrets;secretstores,verbs=get
@@ -251,6 +253,8 @@ func childKind(object client.Object) string {
 	case 3:
 		return "NetworkPolicy"
 	case 4:
+		return "HorizontalPodAutoscaler"
+	case 5:
 		return "HTTPRoute"
 	default:
 		return "Unknown"
@@ -277,6 +281,7 @@ func (r *AIWorkloadReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&networkingv1.NetworkPolicy{}).
+		Owns(&autoscalingv2.HorizontalPodAutoscaler{}).
 		WatchesMetadata(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.RequestsForSecret)).
 		Named(r.ControllerName).
 		Complete(r)

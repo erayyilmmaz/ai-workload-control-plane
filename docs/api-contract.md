@@ -21,6 +21,7 @@ One served/storage version and the `/status` subresource are implemented. No con
 | spec.environment | Optional V1 logical DNS-label identity (1..63 characters), such as `dev`, `staging` or `prod`; it labels AWCP-owned children but never chooses namespace, cluster or permissions |
 | spec.image | Required string, 1..2048 characters, no whitespace (including Unicode space); image availability/non-root execution are runtime concerns |
 | spec.replicas | Integer, default 1, range 0..20; explicit 0 is preserved |
+| spec.autoscaling | Optional bounded HPA contract; enabled mode requires min/max and one CPU, Memory, Pods or External metric; `minReplicas: 0` is rejected on the current 1.36 baseline |
 | spec.container.port | Required integer 1..65535; named container port `http`, TCP |
 | spec.resources | Optional requests/limits maps, only cpu/memory keys, quoted quantity strings of 1..64 characters; future builders convert to native ResourceRequirements |
 | spec.health.readiness.path | Optional block; if present path is non-empty and starts with `/` |

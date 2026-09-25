@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -53,9 +54,11 @@ func childOrder(o client.Object) int {
 		return 2
 	case *networkingv1.NetworkPolicy:
 		return 3
+	case *autoscalingv2.HorizontalPodAutoscaler:
+		return 4
 	case *unstructured.Unstructured:
 		if object.GroupVersionKind() == resource.HTTPRouteGVK {
-			return 4
+			return 5
 		}
 		return -1
 	default:
