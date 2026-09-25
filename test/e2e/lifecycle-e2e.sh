@@ -152,6 +152,29 @@ assert_metrics() {
   stop_port_forward; echo 'Authenticated metrics did not converge' >&2; return 1
 }
 
+wait_manager_failover() {
+  local old="$1" pods candidate attempt
+  for attempt in $(seq 1 90); do
+    pods="$("$kubectl" -n awcp-system get pod -l app.kubernetes.io/name=awcp-controller-manager -o json 2>/dev/null || true)"
+    candidate="$(jq -er --arg old "$old" '[.items[] | select(.metadata.deletionTimestamp == null) | select(.metadata.name != $old) | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))] | if length == 1 then .[0].metadata.name else error("expected one replacement leader") end' <<<"$pods" 2>/dev/null || true)"
+    if test -n "$candidate"; then return 0; fi
+    sleep 1
+  done
+  echo 'manager leader did not fail over after active Pod deletion' >&2; return 1
+}
+
+wait_availability_ready() {
+  local workload="$1" attempt state
+  for attempt in $(seq 1 90); do
+    state="$("$kubectl" -n awcp-workloads get "aiworkload/$workload" -o json 2>/dev/null || true)"
+    if test -n "$state" && jq -e '
+      [.status.conditions[]? | select(.type == "AvailabilityReady" and .status == "True" and .reason == "PDBActive")] | length == 1
+    ' <<<"$state" >/dev/null; then return 0; fi
+    sleep 1
+  done
+  echo "AIWorkload/$workload did not report active PDB" >&2; return 1
+}
+
 install_external_secrets_operator() {
   local lock="test/e2e/external-secrets.lock.json" bundle expected actual url deployment
   bundle="$scratch/external-secrets.yaml"
@@ -379,6 +402,25 @@ assert_version v2
 wait_workload_ready 2
 assert_version v2
 
+# AWCP-28: the workload PDB selects exactly this workload and allows one
+# voluntary disruption at two replicas. Controller PDB + active-leader deletion
+# prove Lease failover without claiming a node-drain or multi-node topology.
+"$kubectl" -n awcp-workloads patch aiworkload/lifecycle-demo --type=merge -p '{"spec":{"availability":{"enabled":true,"minAvailable":1}}}'
+"$kubectl" -n awcp-workloads wait --for=create "poddisruptionbudget/$child" --timeout=90s
+"$kubectl" -n awcp-workloads get "poddisruptionbudget/$child" -o json | jq -e --arg child "$child" '
+  .spec.minAvailable == 1 and .spec.maxUnavailable == null and
+  .spec.selector.matchLabels."app.kubernetes.io/instance" == $child and
+  .spec.selector.matchLabels."platform.example.io/workload-uid" != null and
+  (.metadata.ownerReferences | length == 1)
+' >/dev/null
+wait_availability_ready lifecycle-demo
+"$kubectl" -n awcp-system get poddisruptionbudget/awcp-controller-manager -o json | jq -e '
+  .spec.minAvailable == 1 and .spec.selector.matchLabels."app.kubernetes.io/name" == "awcp-controller-manager"
+' >/dev/null
+active_manager="$("$kubectl" -n awcp-system get pod -l app.kubernetes.io/name=awcp-controller-manager -o json | jq -er '[.items[] | select(.metadata.deletionTimestamp == null) | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))] | if length == 1 then .[0].metadata.name else error("expected one active manager leader") end')"
+"$kubectl" -n awcp-system delete "pod/$active_manager" --wait=false
+wait_manager_failover "$active_manager"
+
 # Child drift before and after manager restart.
 "$kubectl" -n awcp-system rollout restart deployment/awcp-controller-manager
 "$kubectl" -n awcp-system rollout status deployment/awcp-controller-manager --timeout=180s
@@ -403,7 +445,7 @@ assert_metrics
 echo 'Additional safety check: normal package removal preserves workload data and the CRD.'
 make undeploy
 "$kubectl" get crd/aiworkloads.platform.example.io >/dev/null
-"$kubectl" -n awcp-workloads get "aiworkload/$workload" "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child" secret/demo-settings >/dev/null
+"$kubectl" -n awcp-workloads get "aiworkload/$workload" "deployment/$child" "service/$child" "serviceaccount/$child" "networkpolicy/$child" "poddisruptionbudget/$child" secret/demo-settings >/dev/null
 if "$kubectl" -n awcp-system get deployment/awcp-controller-manager >/dev/null 2>&1; then
   echo 'make undeploy left the manager Deployment behind' >&2
   exit 1

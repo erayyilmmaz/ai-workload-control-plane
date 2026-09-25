@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package manager
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestNamespaceValidation(t *testing.T) {
 	for _, value := range []string{"", " ", "default,other", "UPPER", "a/b", "default ", "a.b"} {
@@ -21,6 +24,24 @@ func TestNamespaceValidation(t *testing.T) {
 	}
 	if err := (Options{WatchNamespace: "awcp-workloads", ManagerNamespace: "awcp-system"}).Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLeaderElectionTimingIsBounded(t *testing.T) {
+	valid := Options{WatchNamespace: "awcp-workloads", ManagerNamespace: "awcp-system", LeaseDuration: 15 * time.Second, RenewDeadline: 10 * time.Second, RetryPeriod: 2 * time.Second}
+	if err := valid.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func(*Options){
+		func(o *Options) { o.LeaseDuration = 10 * time.Second; o.RenewDeadline = 10 * time.Second },
+		func(o *Options) { o.RetryPeriod = 10 * time.Second },
+		func(o *Options) { o.RetryPeriod = -time.Second },
+	} {
+		o := valid
+		mutate(&o)
+		if err := o.Validate(); err == nil {
+			t.Fatal("unsafe leader election timing accepted")
+		}
 	}
 }
 

@@ -1,0 +1,14 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: awcp-controller-manager
+  namespace: awcp-system
+  labels:
+    app.kubernetes.io/name: awcp-controller-manager
+spec:
+  # Preserve the active leader for voluntary disruptions. The controller's
+  # Lease and ReleaseOnCancel setting allow the standby to take over safely.
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: awcp-controller-manager

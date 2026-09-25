@@ -4,6 +4,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -20,6 +21,9 @@ func main() {
 	flag.StringVar(&options.ProbeAddress, "health-probe-bind-address", ":8081", "Health/readiness address")
 	flag.StringVar(&options.MetricsBindAddress, "metrics-bind-address", ":8443", "Authenticated HTTPS metrics address")
 	flag.BoolVar(&options.LeaderElection, "leader-elect", true, "Enable manager leader election")
+	flag.DurationVar(&options.LeaseDuration, "leader-election-lease-duration", 15*time.Second, "Leader election lease duration")
+	flag.DurationVar(&options.RenewDeadline, "leader-election-renew-deadline", 10*time.Second, "Leader election renew deadline")
+	flag.DurationVar(&options.RetryPeriod, "leader-election-retry-period", 2*time.Second, "Leader election retry period")
 	logOptions := zap.Options{Development: false}
 	logOptions.BindFlags(flag.CommandLine)
 	flag.Parse()

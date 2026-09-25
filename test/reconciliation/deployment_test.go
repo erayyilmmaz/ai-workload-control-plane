@@ -15,6 +15,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -390,6 +391,55 @@ func TestProductionDeployment(t *testing.T) {
 				return errors.New("re-enabled NetworkPolicy has not converged")
 			}
 			return nil
+		})
+	})
+	t.Run("PodDisruptionBudget lifecycle uses exact selector and current UID ownership", func(t *testing.T) {
+		current = update(t, alpha, func(p *platform.AIWorkload) {
+			p.Spec.Replicas = ptr.To(int32(2))
+			p.Spec.Availability = &platform.AvailabilitySpec{Enabled: ptr.To(true), MinAvailable: ptr.To(int32(1))}
+		})
+		var pdb policyv1.PodDisruptionBudget
+		eventually(t, "workload PodDisruptionBudget", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &pdb); err != nil {
+				return err
+			}
+			owner := metav1.GetControllerOf(&pdb)
+			if owner == nil || owner.UID != alpha.UID || ptr.Deref(owner.BlockOwnerDeletion, true) || pdb.Spec.MinAvailable == nil || pdb.Spec.MinAvailable.IntValue() != 1 || pdb.Spec.MaxUnavailable != nil || pdb.Spec.Selector == nil || !apiequality.Semantic.DeepEqual(pdb.Spec.Selector.MatchLabels, resource.SelectorLabels(alpha)) {
+				return errors.New("PDB managed contract has not converged")
+			}
+			var actual platform.AIWorkload
+			if err := api.Get(ctx, client.ObjectKeyFromObject(alpha), &actual); err != nil {
+				return err
+			}
+			condition := meta.FindStatusCondition(actual.Status.Conditions, "AvailabilityReady")
+			if condition == nil || condition.Status != metav1.ConditionTrue || condition.Reason != "PDBActive" {
+				return errors.New("PDB status condition has not converged")
+			}
+			return nil
+		})
+		pdb.Spec.Selector.MatchLabels = map[string]string{"drift": "true"}
+		if err := api.Update(ctx, &pdb); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "PDB selector drift repair", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &pdb); err != nil {
+				return err
+			}
+			if pdb.Spec.Selector == nil || !apiequality.Semantic.DeepEqual(pdb.Spec.Selector.MatchLabels, resource.SelectorLabels(alpha)) {
+				return errors.New("PDB selector drift has not converged")
+			}
+			return nil
+		})
+		unrelated := &policyv1.PodDisruptionBudget{ObjectMeta: metav1.ObjectMeta{Name: "user-pdb", Namespace: alpha.Namespace}, Spec: policyv1.PodDisruptionBudgetSpec{MinAvailable: ptr.To(intstr.FromInt32(1)), Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"user.example/pdb": "true"}}}}
+		if err := api.Create(ctx, unrelated); err != nil {
+			t.Fatal(err)
+		}
+		current = update(t, alpha, func(p *platform.AIWorkload) { p.Spec.Availability = &platform.AvailabilitySpec{Enabled: ptr.To(false)} })
+		eventually(t, "disabled PDB removal", func() error {
+			if err := api.Get(ctx, keyFor(alpha), &policyv1.PodDisruptionBudget{}); !apierrors.IsNotFound(err) {
+				return errors.New("disabled PDB still exists")
+			}
+			return api.Get(ctx, client.ObjectKeyFromObject(unrelated), &policyv1.PodDisruptionBudget{})
 		})
 	})
 	t.Run("Secret missing restore delete and restore update only safe status", func(t *testing.T) {

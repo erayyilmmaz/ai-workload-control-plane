@@ -34,6 +34,7 @@ flowchart LR
   Controller --> Service
   Controller --> ServiceAccount
   Controller --> NetworkPolicy
+  Controller -. optional PDB .-> PDB[PodDisruptionBudget]
   Controller -. optional HTTPRoute .-> GatewayAPI[Platform Gateway API]
   Controller --> Status[Status, Conditions, Events]
   Controller --> Metrics[Prometheus metrics]
@@ -96,6 +97,7 @@ alpha. A minimal runnable local example is [`examples/basic.yaml`](examples/basi
 | --- | --- |
 | Image and replicas | Required image; replicas default to 1 and allow 0..20 |
 | Autoscaling | Optional bounded `autoscaling/v2` HPA; enabled HPA owns live replica changes |
+| Availability | Optional `policy/v1` PDB for voluntary-disruption protection; controller uses Lease-elected active/standby replicas |
 | HTTP | Required container port; optional `/ready` and `/health` probes |
 | Service | Optional TCP ClusterIP Service; enabled by default |
 | Exposure | Optional same-namespace Gateway API HTTPRoute to the owned Service; no Gateway, DNS or TLS ownership |
@@ -104,7 +106,7 @@ alpha. A minimal runnable local example is [`examples/basic.yaml`](examples/basi
 | Status | Generation, replica observations, endpoint and Ready/Progressing/Degraded conditions |
 
 The detailed field contract and validation boundaries are in
-[API contract](docs/api-contract.md). Read [autoscaling](docs/autoscaling.md) and [HTTPRoute exposure](docs/exposure.md)
+[API contract](docs/api-contract.md). Read [autoscaling](docs/autoscaling.md), [availability](docs/availability.md) and [HTTPRoute exposure](docs/exposure.md)
 before enabling external routing; it requires an administrator-provided Gateway
 and disables AWCP's default same-namespace NetworkPolicy.
 

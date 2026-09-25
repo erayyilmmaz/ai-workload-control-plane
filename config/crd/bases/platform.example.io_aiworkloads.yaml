@@ -147,6 +147,42 @@ spec:
                 - message: minReplicas must not exceed maxReplicas
                   rule: '!has(self.minReplicas) || !has(self.maxReplicas) || self.minReplicas
                     <= self.maxReplicas'
+              availability:
+                description: |-
+                  Availability optionally creates one policy/v1 PodDisruptionBudget for this
+                  workload. It limits voluntary disruptions only; it neither guarantees
+                  capacity nor protects against involuntary failures such as node loss.
+                properties:
+                  enabled:
+                    default: false
+                    description: |-
+                      Enabled defaults to false. Omission preserves V0 behavior and does not
+                      create a PodDisruptionBudget.
+                    type: boolean
+                  maxUnavailable:
+                    description: |-
+                      MaxUnavailable is the integer count of Pods that may be voluntarily
+                      disrupted. Zero deliberately blocks voluntary eviction and is surfaced as
+                      an operational warning for a single-replica workload.
+                    format: int32
+                    maximum: 19
+                    minimum: 0
+                    type: integer
+                  minAvailable:
+                    description: |-
+                      MinAvailable is the integer count of Pods that must remain available during
+                      voluntary disruption. It cannot exceed the workload's configured lower
+                      replica bound; AWCP validates that consistency before applying a PDB.
+                    format: int32
+                    maximum: 20
+                    minimum: 1
+                    type: integer
+                type: object
+                x-kubernetes-validations:
+                - message: enabled availability requires exactly one of minAvailable
+                    or maxUnavailable
+                  rule: '!has(self.enabled) || !self.enabled || (has(self.minAvailable)
+                    != has(self.maxUnavailable))'
               container:
                 description: Container declares the required HTTP TCP port, named
                   http in generated Pods.

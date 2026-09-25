@@ -22,6 +22,7 @@ One served/storage version and the `/status` subresource are implemented. No con
 | spec.image | Required string, 1..2048 characters, no whitespace (including Unicode space); image availability/non-root execution are runtime concerns |
 | spec.replicas | Integer, default 1, range 0..20; explicit 0 is preserved |
 | spec.autoscaling | Optional bounded HPA contract; enabled mode requires min/max and one CPU, Memory, Pods or External metric; `minReplicas: 0` is rejected on the current 1.36 baseline |
+| spec.availability | Optional PDB contract; enabled mode requires exactly one integer `minAvailable` (1..20) or `maxUnavailable` (0..19), constrained to the static/HPA lower replica bound; it protects voluntary disruption only |
 | spec.container.port | Required integer 1..65535; named container port `http`, TCP |
 | spec.resources | Optional requests/limits maps, only cpu/memory keys, quoted quantity strings of 1..64 characters; future builders convert to native ResourceRequirements |
 | spec.health.readiness.path | Optional block; if present path is non-empty and starts with `/` |
@@ -75,6 +76,13 @@ an implementation's data plane can run outside the workload namespace and AWCP
 does not infer or grant its ingress identity. Gateway API status is published as
 the separate `ExposureReady` condition; Deployment `Ready` remains a rollout
 observation. See [HTTPRoute exposure](exposure.md).
+
+When `spec.availability.enabled=true`, AWCP owns a same-namespace `policy/v1`
+PodDisruptionBudget using only the generated workload identity labels. The
+budget accepts exactly one integer `minAvailable` or `maxUnavailable`; percent
+budgets, custom selectors and cross-workload disruption policy are deliberately
+outside the API. `AvailabilityReady` reports PDB observation independently from
+Deployment rollout readiness. See [availability behavior](availability.md).
 
 ## Status
 

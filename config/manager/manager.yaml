@@ -6,10 +6,10 @@ metadata:
   labels:
     app.kubernetes.io/name: awcp-controller-manager
 spec:
-  replicas: 1
-  # A leader-elected singleton cannot become Ready until the old leader releases
-  # its Lease. Delete the old Pod first to avoid a 1-replica rolling-update
-  # deadlock where maxUnavailable's default rounds down to zero.
+  # One leader reconciles while one standby is scheduled for Lease failover.
+  # Readiness is leader-gated, so the PDB protects the active leader rather than
+  # claiming both replicas process reconciliations concurrently.
+  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -38,6 +38,9 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --leader-elect=true
+            - --leader-election-lease-duration=15s
+            - --leader-election-renew-deadline=10s
+            - --leader-election-retry-period=2s
             - --health-probe-bind-address=:8081
             - --metrics-bind-address=:8443
           env:

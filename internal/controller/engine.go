@@ -11,6 +11,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,9 +57,11 @@ func childOrder(o client.Object) int {
 		return 3
 	case *autoscalingv2.HorizontalPodAutoscaler:
 		return 4
+	case *policyv1.PodDisruptionBudget:
+		return 5
 	case *unstructured.Unstructured:
 		if object.GroupVersionKind() == resource.HTTPRouteGVK {
-			return 5
+			return 6
 		}
 		return -1
 	default:

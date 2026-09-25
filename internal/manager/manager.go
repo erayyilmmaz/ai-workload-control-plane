@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -41,6 +42,12 @@ type Options struct {
 	// MetricsBindAddress is disabled for library/tests when empty; cmd/main enables :8443.
 	MetricsBindAddress string
 	LeaderElection     bool
+	// LeaseDuration, RenewDeadline and RetryPeriod make voluntary leader
+	// handoff and unplanned failover timing explicit. Zero selects the
+	// controller-runtime defaults (15s, 10s, 2s) for library callers.
+	LeaseDuration time.Duration
+	RenewDeadline time.Duration
+	RetryPeriod   time.Duration
 	// ControllerName defaults to aiworkload; tests use unique names for sequential managers.
 	ControllerName string
 	// Builder overrides the production plan in tests; nil uses WorkloadBuilder.
@@ -84,7 +91,25 @@ func (o Options) Validate() error {
 	if problems := validation.IsDNS1123Label(o.ManagerNamespace); len(problems) != 0 {
 		return fmt.Errorf("MANAGER_NAMESPACE must be one non-empty DNS-label namespace")
 	}
+	leaseDuration, renewDeadline, retryPeriod := o.effectiveLeaderElectionTiming()
+	if leaseDuration <= 0 || renewDeadline <= 0 || retryPeriod <= 0 || renewDeadline >= leaseDuration || retryPeriod >= renewDeadline {
+		return errors.New("leader election timing requires 0 < retry period < renew deadline < lease duration")
+	}
 	return nil
+}
+
+func (o Options) effectiveLeaderElectionTiming() (time.Duration, time.Duration, time.Duration) {
+	leaseDuration, renewDeadline, retryPeriod := o.LeaseDuration, o.RenewDeadline, o.RetryPeriod
+	if leaseDuration == 0 {
+		leaseDuration = 15 * time.Second
+	}
+	if renewDeadline == 0 {
+		renewDeadline = 10 * time.Second
+	}
+	if retryPeriod == 0 {
+		retryPeriod = 2 * time.Second
+	}
+	return leaseDuration, renewDeadline, retryPeriod
 }
 
 // New constructs the manager without starting processes or modifying the API.
@@ -104,6 +129,7 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 	if metricsAddress == "" {
 		metricsAddress = "0"
 	}
+	leaseDuration, renewDeadline, retryPeriod := options.effectiveLeaderElectionTiming()
 	scheme := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		return nil, err
@@ -122,6 +148,9 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 		LeaderElectionNamespace:       options.ManagerNamespace,
 		LeaderElectionResourceLock:    "leases",
 		LeaderElectionReleaseOnCancel: true,
+		LeaseDuration:                 &leaseDuration,
+		RenewDeadline:                 &renewDeadline,
+		RetryPeriod:                   &retryPeriod,
 	})
 	if err != nil {
 		return nil, err

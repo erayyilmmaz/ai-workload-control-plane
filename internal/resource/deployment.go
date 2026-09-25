@@ -59,7 +59,11 @@ func (WorkloadBuilder) Build(p *platform.AIWorkload) ([]Intent, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []Intent{identity, deployment, service, networkPolicyIntent(desired), autoscaling}, nil
+	availability, err := availabilityIntent(desired)
+	if err != nil {
+		return nil, err
+	}
+	return []Intent{identity, deployment, service, networkPolicyIntent(desired), autoscaling, availability}, nil
 }
 
 // SelectorLabels returns fresh stable identity labels, independent of generation/image.

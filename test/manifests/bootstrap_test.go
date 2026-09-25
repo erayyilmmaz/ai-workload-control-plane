@@ -10,6 +10,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/yaml"
@@ -29,8 +30,8 @@ func readYAML(t *testing.T, path string, value any) {
 func TestManagerSecurity(t *testing.T) {
 	var deployment appsv1.Deployment
 	readYAML(t, "config/manager/manager.yaml", &deployment)
-	if deployment.Namespace != "awcp-system" || deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != 1 {
-		t.Fatal("bootstrap supports one manager in awcp-system")
+	if deployment.Namespace != "awcp-system" || deployment.Spec.Replicas == nil || *deployment.Spec.Replicas != 2 {
+		t.Fatal("bootstrap requires two manager replicas in awcp-system")
 	}
 	pod := deployment.Spec.Template.Spec
 	security := pod.SecurityContext
@@ -57,14 +58,28 @@ func TestManagerSecurity(t *testing.T) {
 	if container.LivenessProbe == nil || container.LivenessProbe.HTTPGet.Path != "/healthz" || container.ReadinessProbe == nil || container.ReadinessProbe.HTTPGet.Path != "/readyz" {
 		t.Fatal("both probes must be configured")
 	}
-	if !strings.Contains(strings.Join(container.Args, " "), "--leader-elect=true") || !strings.Contains(strings.Join(container.Args, " "), "--metrics-bind-address=:8443") {
-		t.Fatal("leader election must be enabled")
+	args := strings.Join(container.Args, " ")
+	for _, value := range []string{"--leader-elect=true", "--leader-election-lease-duration=15s", "--leader-election-renew-deadline=10s", "--leader-election-retry-period=2s", "--metrics-bind-address=:8443"} {
+		if !strings.Contains(args, value) {
+			t.Fatalf("manager argument missing: %s", value)
+		}
 	}
 	if len(container.Ports) != 2 || container.Ports[1].Name != "metrics" || container.Ports[1].ContainerPort != 8443 || len(container.VolumeMounts) != 1 || container.VolumeMounts[0].MountPath != "/tmp/k8s-metrics-server/serving-certs" || len(pod.Volumes) != 1 || pod.Volumes[0].EmptyDir == nil {
 		t.Fatal("secure metrics serving volume or port missing")
 	}
 	if len(container.Env) != 2 || container.Env[0].Name != "WATCH_NAMESPACES" || container.Env[0].Value != "awcp-workloads,awcp-tenant-alpha,awcp-tenant-bravo,awcp-tenant-charlie" || container.Env[1].Name != "MANAGER_NAMESPACE" || container.Env[1].ValueFrom.FieldRef.FieldPath != "metadata.namespace" {
 		t.Fatal("namespace configuration drift")
+	}
+}
+
+func TestManagerPDBProtectsOneLeader(t *testing.T) {
+	var pdb policyv1.PodDisruptionBudget
+	readYAML(t, "config/manager/poddisruptionbudget.yaml", &pdb)
+	if pdb.Namespace != "awcp-system" || pdb.Name != "awcp-controller-manager" || pdb.Spec.MinAvailable == nil || pdb.Spec.MinAvailable.IntValue() != 1 || pdb.Spec.MaxUnavailable != nil {
+		t.Fatalf("unexpected manager PDB: %#v", pdb.Spec)
+	}
+	if pdb.Spec.Selector == nil || len(pdb.Spec.Selector.MatchExpressions) != 0 || pdb.Spec.Selector.MatchLabels["app.kubernetes.io/name"] != "awcp-controller-manager" {
+		t.Fatalf("manager PDB selector drift: %#v", pdb.Spec.Selector)
 	}
 }
 
@@ -95,7 +110,7 @@ func TestMetricsAuthenticationRBACAndService(t *testing.T) {
 func TestGeneratedRBACAndCRD(t *testing.T) {
 	var role rbacv1.Role
 	readYAML(t, "config/rbac/role.yaml", &role)
-	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 13 {
+	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 14 {
 		t.Fatalf("unexpected runtime role: %+v", role)
 	}
 	want := map[string]string{
@@ -108,6 +123,7 @@ func TestGeneratedRBACAndCRD(t *testing.T) {
 		"/services":                                        "create,delete,get,list,patch,update,watch",
 		"apps/deployments":                                 "create,get,list,patch,update,watch",
 		"autoscaling/horizontalpodautoscalers":             "create,delete,get,list,patch,update,watch",
+		"policy/poddisruptionbudgets":                      "create,delete,get,list,patch,update,watch",
 		"networking.k8s.io/networkpolicies":                "create,delete,get,list,patch,update,watch",
 		"events.k8s.io/events":                             "create,patch,update",
 		"platform.example.io/aiworkloads":                  "get,list,watch",

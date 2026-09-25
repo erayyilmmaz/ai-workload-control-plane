@@ -70,6 +70,12 @@ type AIWorkloadSpec struct {
 	// +optional
 	Autoscaling *AutoscalingSpec `json:"autoscaling,omitempty"`
 
+	// Availability optionally creates one policy/v1 PodDisruptionBudget for this
+	// workload. It limits voluntary disruptions only; it neither guarantees
+	// capacity nor protects against involuntary failures such as node loss.
+	// +optional
+	Availability *AvailabilitySpec `json:"availability,omitempty"`
+
 	// Container declares the required HTTP TCP port, named http in generated Pods.
 	// +required
 	Container ContainerSpec `json:"container"`
@@ -252,6 +258,33 @@ type AutoscalingMetricSpec struct {
 	MetricName string `json:"metricName,omitempty"`
 	// +optional
 	TargetValue *ResourceQuantity `json:"targetValue,omitempty"`
+}
+
+// AvailabilitySpec is a bounded PodDisruptionBudget contract. Exactly one
+// budget shape is required when it is enabled so an AIWorkload cannot express
+// contradictory eviction policy. Percentages, selectors and cross-workload
+// budgets remain platform-owned concerns.
+// +kubebuilder:validation:XValidation:rule="!has(self.enabled) || !self.enabled || (has(self.minAvailable) != has(self.maxUnavailable))",message="enabled availability requires exactly one of minAvailable or maxUnavailable"
+type AvailabilitySpec struct {
+	// Enabled defaults to false. Omission preserves V0 behavior and does not
+	// create a PodDisruptionBudget.
+	// +kubebuilder:default=false
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+	// MinAvailable is the integer count of Pods that must remain available during
+	// voluntary disruption. It cannot exceed the workload's configured lower
+	// replica bound; AWCP validates that consistency before applying a PDB.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=20
+	// +optional
+	MinAvailable *int32 `json:"minAvailable,omitempty"`
+	// MaxUnavailable is the integer count of Pods that may be voluntarily
+	// disrupted. Zero deliberately blocks voluntary eviction and is surfaced as
+	// an operational warning for a single-replica workload.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=19
+	// +optional
+	MaxUnavailable *int32 `json:"maxUnavailable,omitempty"`
 }
 
 // ExposureMode bounds the V1 traffic surface to the existing ClusterIP Service

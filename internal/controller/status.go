@@ -115,6 +115,9 @@ func (r *AIWorkloadReconciler) observeAndReportStatus(ctx context.Context, workl
 	if err := r.observeAutoscaling(ctx, workload); err != nil {
 		return fmt.Errorf("observe autoscaling: %w", err)
 	}
+	if err := r.observeAvailability(ctx, workload); err != nil {
+		return fmt.Errorf("observe availability: %w", err)
+	}
 	wasReady := meta.IsStatusConditionTrue(before.Status.Conditions, conditionReady)
 	workload.Status.ObservedGeneration = workload.Generation
 	workload.Status.DesiredReplicas = desiredReplicas(workload)

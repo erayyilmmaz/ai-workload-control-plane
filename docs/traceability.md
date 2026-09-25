@@ -72,6 +72,7 @@ reference while preserving GitOps ownership of platform and workload manifests.
 | V1-07 | AWCP-25 | External Secrets integration and target rotation | ESO v1 namespace-bound references, metadata-only rollout trigger and hosted kind proof | AWCP-19, 23 |
 | V1-08 | AWCP-26 | Workload exposure lifecycle and Gateway API HTTPRoute | Strict exposure CRD contract, namespace-local Gateway validation, owner-safe route lifecycle and hosted kind traffic proof | AWCP-19, 24 |
 | V1-09 | AWCP-27 | Autoscaling and HPA lifecycle | Bounded HPA API, replica ownership separation, schema/envtest and HPA lifecycle evidence | AWCP-19 |
+| V1-10 | AWCP-28 | Availability, PDB and controller leader election | Bounded PDB contract, owner-safe selector/lifecycle, leader timing and disposable kind failover proof | AWCP-19, 27 |
 
 Each behavior gets relevant tests while it is implemented. AWCP-13 consolidates regression coverage; it does not postpone all tests until the end. Status logic introduced early may use temporary fixtures until the full lifecycle is available.
 

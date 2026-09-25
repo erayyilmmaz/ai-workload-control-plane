@@ -24,7 +24,7 @@ func (f BuilderFunc) Build(p *platformv1alpha1.AIWorkload) ([]Intent, error) { r
 // Intent targets one child. Object is a fresh typed identity, not a cached object.
 // Mutate sets ONLY owned fields, preserving API defaults, unrelated metadata and
 // injected fields. It runs on both fresh and existing objects, and must be pure.
-// Absent is allowed only for optional Service/NetworkPolicy children.
+// Absent is allowed only for optional Service, NetworkPolicy, HPA, or PDB children.
 type Intent struct {
 	Object client.Object
 	Mutate func(client.Object) error

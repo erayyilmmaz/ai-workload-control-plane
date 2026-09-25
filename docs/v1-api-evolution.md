@@ -44,7 +44,7 @@ only in their owning story after schema, builder, status and lifecycle tests exi
 | `spec.exposure` | AWCP-26 | Implemented `ClusterLocal` or namespace-local HTTPRoute intent with exact Gateway listener/hostname/path | Existing ClusterIP Service behavior is unchanged |
 | `spec.delivery` | AWCP-29 | Rolling, Canary or BlueGreen rollout intent | Existing Deployment rolling update is retained |
 | `spec.externalSecrets` | AWCP-25 | Implemented namespace-local `{externalSecret,targetSecret}` ESO references without values; only Ready SecretStore/ExternalSecret targets are consumed | Existing direct `secretRefs` semantics are retained |
-| `spec.availability` | AWCP-28 | Workload PDB intent | No PDB is created |
+| `spec.availability` | AWCP-28 | Implemented owner-safe integer PDB intent and single-replica disruption warning | Omission preserves V0 behavior; no PDB is created |
 | `spec.policy` | AWCP-24 | Implemented optional `baseline` or `restricted` platform profile; never arbitrary CEL | Omission preserves V0 behavior outside a namespace selected by a policy binding |
 
 `environment`, `tenant`, and `policy` remain declarative identity, not authority. GitOps

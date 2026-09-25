@@ -290,6 +290,27 @@ func TestAPIContract(t *testing.T) {
 			}
 		}
 	})
+	t.Run("availability-is-an-optional-bounded-pdb-contract", func(t *testing.T) {
+		o := minimal("pdb-availability")
+		set(t, o, int64(3), "spec", "replicas")
+		set(t, o, map[string]any{"enabled": true, "minAvailable": int64(2)}, "spec", "availability")
+		create(t, o)
+		get(t, o)
+		expect(t, o, true, "spec", "availability", "enabled")
+		expect(t, o, int64(2), "spec", "availability", "minAvailable")
+		for name, availability := range map[string]map[string]any{
+			"availability-empty":        {"enabled": true},
+			"availability-both":         {"enabled": true, "minAvailable": int64(1), "maxUnavailable": int64(1)},
+			"availability-min-zero":     {"enabled": true, "minAvailable": int64(0)},
+			"availability-max-negative": {"enabled": true, "maxUnavailable": int64(-1)},
+		} {
+			invalid := minimal(name)
+			set(t, invalid, availability, "spec", "availability")
+			if err := api.Create(t.Context(), invalid, &client.CreateOptions{FieldValidation: "Strict"}); !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "spec.availability") {
+				t.Fatalf("invalid availability %q accepted: %v", name, err)
+			}
+		}
+	})
 	t.Run("invalid-fixtures", func(t *testing.T) {
 		data, err := os.ReadFile("../fixtures/invalid/index.json")
 		if err != nil {
@@ -412,7 +433,7 @@ func TestAPIContract(t *testing.T) {
 			return string(out)
 		}
 		out := run("explain", "aiworkload.spec", "--api-version=platform.example.io/v1alpha1")
-		for _, field := range []string{"image", "replicas", "autoscaling", "container", "resources", "health", "service", "secretRefs", "externalSecrets", "network"} {
+		for _, field := range []string{"image", "replicas", "autoscaling", "availability", "container", "resources", "health", "service", "secretRefs", "externalSecrets", "network"} {
 			if !strings.Contains(out, field) {
 				t.Fatalf("missing explain field %s: %s", field, out)
 			}
