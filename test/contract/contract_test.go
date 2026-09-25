@@ -243,6 +243,34 @@ func TestAPIContract(t *testing.T) {
 			t.Fatalf("duplicate ExternalSecret target accepted: %v", err)
 		}
 	})
+	t.Run("exposure-is-an-optional-namespaced-http-route-contract", func(t *testing.T) {
+		route := minimal("http-route-exposure")
+		set(t, route, map[string]any{
+			"mode": "HTTPRoute", "gateway": "platform-gateway", "sectionName": "http",
+			"hostname": "api.example.test", "path": "/v1",
+		}, "spec", "exposure")
+		create(t, route)
+		get(t, route)
+		expect(t, route, "HTTPRoute", "spec", "exposure", "mode")
+		expect(t, route, "platform-gateway", "spec", "exposure", "gateway")
+
+		clusterLocal := minimal("cluster-local-exposure")
+		set(t, clusterLocal, map[string]any{"mode": "ClusterLocal"}, "spec", "exposure")
+		create(t, clusterLocal)
+
+		for name, exposure := range map[string]map[string]any{
+			"missing-route-fields":       {"mode": "HTTPRoute", "gateway": "platform-gateway"},
+			"cluster-local-route-fields": {"mode": "ClusterLocal", "hostname": "api.example.test"},
+			"wrong-route-mode":           {"mode": "LoadBalancer"},
+			"invalid-hostname":           {"mode": "HTTPRoute", "gateway": "platform-gateway", "sectionName": "http", "hostname": "API.Example.Test", "path": "/"},
+		} {
+			invalid := minimal(name)
+			set(t, invalid, exposure, "spec", "exposure")
+			if err := api.Create(t.Context(), invalid, &client.CreateOptions{FieldValidation: "Strict"}); !apierrors.IsInvalid(err) || !strings.Contains(err.Error(), "spec.exposure") {
+				t.Fatalf("invalid exposure %q accepted: %v", name, err)
+			}
+		}
+	})
 	t.Run("invalid-fixtures", func(t *testing.T) {
 		data, err := os.ReadFile("../fixtures/invalid/index.json")
 		if err != nil {

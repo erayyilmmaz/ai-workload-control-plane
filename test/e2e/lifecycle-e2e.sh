@@ -166,6 +166,63 @@ install_external_secrets_operator() {
   done
 }
 
+install_gateway_api() {
+  local lock="test/e2e/gateway-api.lock.json" bundle expected actual url
+  bundle="$scratch/envoy-gateway.yaml"
+  url="$(jq -er '.url' "$lock")"
+  expected="$(jq -er '.sha256' "$lock")"
+  curl --fail --silent --show-error --location "$url" -o "$bundle"
+  actual="$(shasum -a 256 "$bundle" | awk '{print $1}')"
+  test "$actual" = "$expected" || { echo 'Envoy Gateway manifest checksum mismatch' >&2; return 1; }
+  "$kubectl" apply --server-side --force-conflicts -f "$bundle"
+  "$kubectl" -n envoy-gateway-system rollout status deployment/envoy-gateway --timeout=300s
+  "$kubectl" apply -f test/e2e/gateway-api.yaml
+  "$kubectl" -n awcp-workloads wait --for=condition=Programmed gateway/awcp-e2e-gateway --timeout=180s
+}
+
+wait_http_route_ready() {
+  local name="$1" state attempt
+  for attempt in $(seq 1 90); do
+    state="$("$kubectl" -n awcp-workloads get "httproute/$name" -o json 2>/dev/null || true)"
+    if test -n "$state" && jq -e '
+      [.status.parents[]? | select(
+        .parentRef.name == "awcp-e2e-gateway" and .parentRef.sectionName == "http" and
+        ([.conditions[]? | select(.type == "Accepted" and .status == "True")] | length == 1) and
+        ([.conditions[]? | select(.type == "ResolvedRefs" and .status == "True")] | length == 1)
+      )] | length == 1
+    ' <<<"$state" >/dev/null; then return 0; fi
+    sleep 1
+  done
+  echo "HTTPRoute/$name did not become accepted with resolved references" >&2; return 1
+}
+
+wait_exposure_ready() {
+  local name="$1" state attempt
+  for attempt in $(seq 1 90); do
+    state="$("$kubectl" -n awcp-workloads get "aiworkload/$name" -o json 2>/dev/null || true)"
+    if test -n "$state" && jq -e '
+      [.status.conditions[]? | select(.type == "ExposureReady" and .status == "True" and .reason == "HTTPRouteReady")] | length == 1
+    ' <<<"$state" >/dev/null; then return 0; fi
+    sleep 1
+  done
+  echo "AIWorkload/$name did not report HTTPRouteReady" >&2; return 1
+}
+
+assert_gateway_route_version() {
+  local service port actual="" attempt
+  service="$("$kubectl" -n envoy-gateway-system get service --selector='gateway.envoyproxy.io/owning-gateway-namespace=awcp-workloads,gateway.envoyproxy.io/owning-gateway-name=awcp-e2e-gateway' -o json | jq -er '[.items[] | select(any(.spec.ports[]?; .port == 80))] | if length == 1 then .[0].metadata.name else error("expected one Envoy Gateway Service") end')"
+  : > "$scratch/gateway-port-forward.log"
+  "$kubectl" -n envoy-gateway-system port-forward "service/$service" 0:80 >"$scratch/gateway-port-forward.log" 2>&1 & port_forward_pid=$!
+  for attempt in $(seq 1 45); do
+    port="$(sed -nE 's/.*127\.0\.0\.1:([0-9]+).*/\1/p' "$scratch/gateway-port-forward.log" | head -n 1)"
+    if test -n "$port"; then actual="$(curl --fail --silent --show-error --max-time 5 -H 'Host: route.awcp.test' "http://127.0.0.1:$port/version" || true)"; test "$actual" = v1 && break; fi
+    kill -0 "$port_forward_pid" 2>/dev/null || { cat "$scratch/gateway-port-forward.log" >&2; return 1; }
+    sleep 1
+  done
+  stop_port_forward
+  test "$actual" = v1 || { echo "Gateway HTTPRoute returned ${actual:-no response}, expected v1" >&2; return 1; }
+}
+
 wait_external_secret_ready() {
   local attempt state
   for attempt in $(seq 1 90); do
@@ -206,6 +263,24 @@ created=true
 make deploy DEPLOY_IMG="$manager_image"
 "$kubectl" apply -f examples/observability/metrics-reader-clusterrole.yaml
 "$kubectl" apply -f test/e2e/metrics-reader.yaml
+
+# AWCP-26: Gateway API stays optional at manager startup. Install its pinned
+# Envoy Gateway implementation afterwards, then prove an AWCP-owned HTTPRoute
+# accepts, resolves and serves the existing ClusterIP Service.
+install_gateway_api
+"$kubectl" apply -f test/e2e/http-route-workload.yaml
+route_workload=http-route-exposure
+route_hash="$(printf '%s' "$route_workload" | shasum -a 256 | awk '{print substr($1, 1, 16)}')"
+route_child="awcp-$route_workload-$route_hash"
+"$kubectl" -n awcp-workloads wait --for=create "httproute/$route_child" --timeout=120s
+wait_http_route_ready "$route_child"
+wait_exposure_ready "$route_workload"
+"$kubectl" -n awcp-workloads rollout status "deployment/$route_child" --timeout=180s
+assert_gateway_route_version
+"$kubectl" -n awcp-workloads delete "aiworkload/$route_workload" --wait=false
+"$kubectl" -n awcp-workloads wait --for=delete "aiworkload/$route_workload" --timeout=90s
+"$kubectl" -n awcp-workloads wait --for=delete "httproute/$route_child" --timeout=90s
+"$kubectl" -n awcp-workloads get gateway/awcp-e2e-gateway >/dev/null
 
 # AWCP-25: execute the checksum-verified official ESO manifest on this disposable
 # kind cluster, then prove provider sync and target metadata rotation without

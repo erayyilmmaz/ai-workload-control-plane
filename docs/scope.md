@@ -41,6 +41,7 @@ A developer with namespace access should describe one application rather than ma
 | Manager replicas | One manager process in V0; leader election enabled | No HA or multi-replica failover claim |
 | Direct Secret rotation rollout | Deferred | Updating `spec.secretRefs` data does not promise to refresh an existing process environment |
 | ESO target rotation rollout | Included in AWCP-25 | A Ready namespace-local ExternalSecret target metadata change rolls the owned Deployment without AWCP reading Secret data |
+| Gateway API HTTPRoute exposure | Included in AWCP-26 | One namespace-local, platform-managed Gateway route; Gateway, DNS, TLS and data-plane NetworkPolicy remain platform-owned |
 | Startup probe | Deferred | Slow-start applications must work within the documented HTTP probe contract |
 | Image registry authentication | Deferred | No V0 `imagePullSecrets` field; examples use public or locally loaded images |
 

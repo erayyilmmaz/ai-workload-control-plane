@@ -27,6 +27,7 @@ One served/storage version and the `/status` subresource are implemented. No con
 | spec.health.liveness.path | Same rule; no probe when its block is omitted |
 | spec.service.enabled | Default true; explicit false is preserved even with defaulted siblings |
 | spec.service.port | Default 80, range 1..65535; ClusterIP TCP only, targetPort `http` |
+| spec.exposure | Optional `ClusterLocal` or namespace-local `HTTPRoute` intent. HTTPRoute requires `gateway`, `sectionName`, exact DNS `hostname` and `/`-prefixed `path`; it never selects a namespace, Service type, TLS or arbitrary backend. |
 | spec.secretRefs | Default empty ordered list, at most 32 unique Secret DNS-subdomain names of 1..253 characters, from the CR namespace |
 | spec.externalSecrets | Optional ordered list of at most 16 unique `{externalSecret, targetSecret}` DNS-subdomain pairs. Both names are namespace-local ESO references; neither is a provider value or remote key. |
 | spec.network.enabled | Default true; same-namespace ingress to container TCP port; no egress isolation |
@@ -67,6 +68,12 @@ Direct Secret references map to non-optional `envFrom.secretRef`. `externalSecre
 Deleting a Secret makes the desired contract unmet even if existing pods still hold environment values. Recreating it triggers a new observation through the reference index/watch. Direct `secretRefs` updates do not restart a process. For an `externalSecrets` target only, a changed Secret metadata resourceVersion is hashed into the owned Pod-template annotation and therefore triggers a normal Deployment rollout without hashing or exposing Secret payload. This detects ESO target updates, not credential validity or revocation.
 
 The generated NetworkPolicy has policyTypes=[Ingress], selects only the CR UID/name labels, and permits same-namespace pods (`podSelector: {}` within an ingress peer) to the container's TCP port. It contains no Egress policy type. Other Kubernetes policies remain additive; disabling this policy does not remove other restrictions. Cluster CNI enforcement is an external prerequisite for traffic isolation claims.
+
+An HTTPRoute exposure must explicitly set `spec.network.enabled: false`, because
+an implementation's data plane can run outside the workload namespace and AWCP
+does not infer or grant its ingress identity. Gateway API status is published as
+the separate `ExposureReady` condition; Deployment `Ready` remains a rollout
+observation. See [HTTPRoute exposure](exposure.md).
 
 ## Status
 

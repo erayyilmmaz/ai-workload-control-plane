@@ -7,6 +7,10 @@ one `ClusterIP` Service with one TCP port named `http`. The Service port default
 numeric container port into `targetPort`. This keeps a Service port update separate
 from the workload's internal listener contract.
 
+AWCP-26 preserves this Service shape. Its optional Gateway API HTTPRoute is a
+separate, current-UID-owned child that selects this ClusterIP Service; it does not
+change the Service to `LoadBalancer` or `NodePort`. See [HTTPRoute exposure](exposure.md).
+
 ## Ownership boundary
 
 | Field | Controller-owned | Preserved or rejected |

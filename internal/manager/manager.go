@@ -131,7 +131,7 @@ func New(cfg *rest.Config, options Options) (ctrl.Manager, error) {
 		return nil, err
 	}
 	if err = (&controller.AIWorkloadReconciler{
-		Client: mgr.GetClient(), TenantReader: mgr.GetAPIReader(), ExternalSecretsReader: mgr.GetAPIReader(), CapabilityLookup: capability.DiscoveryLookup{Discovery: discoveryClient}, WatchNamespaces: watchNamespaces, Builder: options.Builder, ControllerName: options.ControllerName, Telemetry: telemetry.Default(),
+		Client: mgr.GetClient(), TenantReader: mgr.GetAPIReader(), ExternalSecretsReader: mgr.GetAPIReader(), GatewayReader: mgr.GetAPIReader(), CapabilityLookup: capability.DiscoveryLookup{Discovery: discoveryClient}, WatchNamespaces: watchNamespaces, Builder: options.Builder, ControllerName: options.ControllerName, Telemetry: telemetry.Default(),
 	}).SetupWithManager(mgr); err != nil {
 		return nil, err
 	}

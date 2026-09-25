@@ -19,8 +19,10 @@ surface consistently.
 `AIWorkload` gives a developer one namespaced desired-state object. The controller
 observes it and manages only its derived children: Deployment, optional ClusterIP
 Service, dedicated tokenless ServiceAccount and optional ingress-only
-NetworkPolicy. The workload image supplies application or AI behavior; AWCP never
-runs a model, agent, prompt or external AI credential itself.
+NetworkPolicy. An explicit V1 opt-in can add one Gateway API HTTPRoute to that
+same Service; AWCP never creates Gateway infrastructure, DNS or TLS material. The
+workload image supplies application or AI behavior; AWCP never runs a model,
+agent, prompt or external AI credential itself.
 
 ## Architecture
 
@@ -32,6 +34,7 @@ flowchart LR
   Controller --> Service
   Controller --> ServiceAccount
   Controller --> NetworkPolicy
+  Controller -. optional HTTPRoute .-> GatewayAPI[Platform Gateway API]
   Controller --> Status[Status, Conditions, Events]
   Controller --> Metrics[Prometheus metrics]
   Metrics -. optional .-> Grafana[Grafana]
@@ -94,12 +97,15 @@ alpha. A minimal runnable local example is [`examples/basic.yaml`](examples/basi
 | Image and replicas | Required image; replicas default to 1 and allow 0..20 |
 | HTTP | Required container port; optional `/ready` and `/health` probes |
 | Service | Optional TCP ClusterIP Service; enabled by default |
+| Exposure | Optional same-namespace Gateway API HTTPRoute to the owned Service; no Gateway, DNS or TLS ownership |
 | Secrets | Ordered same-namespace `envFrom` references; payload is never read by AWCP |
 | Network | Optional same-namespace ingress-only NetworkPolicy; no egress isolation |
 | Status | Generation, replica observations, endpoint and Ready/Progressing/Degraded conditions |
 
 The detailed field contract and validation boundaries are in
-[API contract](docs/api-contract.md).
+[API contract](docs/api-contract.md). Read [HTTPRoute exposure](docs/exposure.md)
+before enabling external routing; it requires an administrator-provided Gateway
+and disables AWCP's default same-namespace NetworkPolicy.
 
 ## Example
 
@@ -195,6 +201,9 @@ least privilege, GitOps delivery and Terraform/IaC separation.
   bootstrap, signing or production-cluster evidence exists.
 - NetworkPolicy generation is proven; CNI traffic enforcement is not part of the
   default kind profile. There is no egress policy.
+- HTTPRoute is an opt-in reference integration. Gateway ownership, external DNS,
+  TLS, load-balancer provisioning and Gateway-to-workload network policy remain
+  platform responsibilities.
 - No automatic Secret rotation/revocation for an already running process.
 - No published manager image, tag, GitHub Release, SBOM, signing or provenance yet.
 

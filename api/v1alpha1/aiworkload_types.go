@@ -81,6 +81,12 @@ type AIWorkloadSpec struct {
 	// +optional
 	Service *ServiceSpec `json:"service,omitempty"`
 
+	// Exposure optionally selects a cluster-local endpoint or one namespace-local
+	// Gateway API HTTPRoute. It never creates a Gateway, changes the Service type,
+	// or accepts cross-namespace routing authority.
+	// +optional
+	Exposure *ExposureSpec `json:"exposure,omitempty"`
+
 	// SecretRefs contains ordered, unique Secret names in this CR's namespace.
 	// Later envFrom entries win on overlapping keys. Values are never part of this API.
 	// +kubebuilder:default={}
@@ -172,6 +178,52 @@ type ServiceSpec struct {
 	// +kubebuilder:validation:Maximum=65535
 	// +optional
 	Port *int32 `json:"port,omitempty"`
+}
+
+// ExposureMode bounds the V1 traffic surface to the existing ClusterIP Service
+// or a single HTTPRoute attached to a platform-managed Gateway.
+// +kubebuilder:validation:Enum=ClusterLocal;HTTPRoute
+type ExposureMode string
+
+const (
+	ExposureClusterLocal ExposureMode = "ClusterLocal"
+	ExposureHTTPRoute    ExposureMode = "HTTPRoute"
+)
+
+// ExposureSpec describes an optional HTTPRoute without delegating Gateway
+// selection or listener configuration to the workload. Gateway, hostname and
+// path are all same-namespace, one-route values; TLS, filters, weights and
+// cross-namespace references remain platform-owned concerns.
+// +kubebuilder:validation:XValidation:rule="self.mode != 'HTTPRoute' || (has(self.gateway) && has(self.sectionName) && has(self.hostname) && has(self.path))",message="HTTPRoute exposure requires gateway, sectionName, hostname and path"
+// +kubebuilder:validation:XValidation:rule="self.mode != 'ClusterLocal' || (!has(self.gateway) && !has(self.sectionName) && !has(self.hostname) && !has(self.path))",message="ClusterLocal exposure must not configure Gateway API routing fields"
+type ExposureSpec struct {
+	// Mode either preserves cluster-local Service discovery or enables one HTTPRoute.
+	// +required
+	Mode ExposureMode `json:"mode"`
+	// Gateway is an existing Gateway API Gateway in this workload's namespace.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+	// +optional
+	Gateway string `json:"gateway,omitempty"`
+	// SectionName selects one named HTTP listener on the namespace-local Gateway.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+	// +optional
+	SectionName string `json:"sectionName,omitempty"`
+	// Hostname is the exact DNS hostname matched by the HTTPRoute.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern="^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+	// +optional
+	Hostname string `json:"hostname,omitempty"`
+	// Path is a PathPrefix HTTPRoute match and must begin with /.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=2048
+	// +kubebuilder:validation:Pattern="^/"
+	// +optional
+	Path string `json:"path,omitempty"`
 }
 
 // SecretReference is a Kubernetes DNS-subdomain Secret name, not a payload or cross-namespace path.

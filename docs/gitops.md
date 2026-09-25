@@ -9,7 +9,7 @@ controller remains the sole writer of its owned children.
 
 | Owner | Resources / responsibility | Explicitly not owned |
 | --- | --- | --- |
-| Git + Argo CD platform Application | `config/default`: namespaces, tenant profiles/quotas/limits, admission policy/binding, CRD, AWCP manager, bounded RBAC and metrics Service; optional namespace-local ESO SecretStore/ExternalSecret manifests after ESO bootstrap | Argo CD/ESO installation, provider credentials and destructive platform prune |
+| Git + Argo CD platform Application | `config/default`: namespaces, tenant profiles/quotas/limits, admission policy/binding, CRD, AWCP manager, bounded RBAC and metrics Service; optional namespace-local ESO SecretStore/ExternalSecret and Gateway API HTTPRoute manifests after their platform prerequisites are healthy | Argo CD/ESO/Gateway installation, provider credentials, DNS/TLS and destructive platform prune |
 | Git + Argo CD ApplicationSet | Parent `AIWorkload` objects rendered from `gitops/workloads/environments/*` | Generated Deployment, Service, ServiceAccount and NetworkPolicy |
 | AWCP controller | Current-parent UID-owned workload children and status/events | Argo CD `Application`/`AppProject`, user Secrets, namespaces and shared infrastructure |
 | Cluster administrator | Argo CD bootstrap, repository policy, credential/SSO configuration, production image selection and CRD/namespace removal | Application content changes made by a workload developer |
@@ -23,7 +23,8 @@ from overwriting one another.
 explicit platform, shared-workload, and three reference tenant namespaces. Its
 cluster-scoped whitelist is limited to Namespace, CRD, metrics-auth RBAC, and the
 single reviewed ValidatingAdmissionPolicy/Binding kinds required for AWCP-24 and
-the namespace-scoped ESO SecretStore/ExternalSecret kinds consumed by AWCP-25;
+the namespace-scoped ESO SecretStore/ExternalSecret kinds consumed by AWCP-25
+and HTTPRoute kind consumed by AWCP-26;
 tenant resources remain namespace-scoped. It is a starting boundary, not a
 replacement for cluster admission/RBAC policy. AWCP-23 keeps the manager's runtime
 scope bounded to the exact same namespace list rather than granting it a

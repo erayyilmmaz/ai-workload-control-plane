@@ -39,14 +39,17 @@ type AIWorkloadReconciler struct {
 	// ExternalSecretsReader performs narrow direct reads of optional ESO objects;
 	// it is not a provider client and never reads Secret data.
 	ExternalSecretsReader client.Reader
-	CapabilityLookup      capability.ResourceLookup
-	WatchNamespace        string
-	WatchNamespaces       []string
-	ControllerName        string
-	Scheme                *runtime.Scheme
-	Builder               resource.Builder
-	Recorder              events.EventRecorder
-	Telemetry             telemetry.Recorder
+	// GatewayReader performs narrow direct reads of optional Gateway API objects.
+	// It never creates Gateways or discovers cross-namespace routing authority.
+	GatewayReader    client.Reader
+	CapabilityLookup capability.ResourceLookup
+	WatchNamespace   string
+	WatchNamespaces  []string
+	ControllerName   string
+	Scheme           *runtime.Scheme
+	Builder          resource.Builder
+	Recorder         events.EventRecorder
+	Telemetry        telemetry.Recorder
 }
 
 // +kubebuilder:rbac:groups=platform.example.io,namespace=awcp-workloads,resources=aiworkloads,verbs=get;list;watch
@@ -58,6 +61,8 @@ type AIWorkloadReconciler struct {
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",namespace=awcp-workloads,resources=configmaps,resourceNames=awcp-tenant-profile,verbs=get
 // +kubebuilder:rbac:groups=external-secrets.io,namespace=awcp-workloads,resources=externalsecrets;secretstores,verbs=get
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,namespace=awcp-workloads,resources=gateways,verbs=get
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,namespace=awcp-workloads,resources=httproutes,verbs=get;list;watch;create;patch;delete
 // +kubebuilder:rbac:groups=events.k8s.io,namespace=awcp-workloads,resources=events,verbs=create;patch;update
 
 // Reconcile guards parent lifecycle, builds/validates a plan, then applies in dependency order.
@@ -92,11 +97,26 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if _, err := r.patchStatus(ctx, externalBefore, &workload); err != nil {
 		return r.reportFailure(ctx, &workload, err)
 	}
+	exposureBefore := workload.DeepCopy()
+	exposure, err := r.validateExposure(ctx, &workload)
+	if err != nil {
+		return r.reportFailure(ctx, &workload, err)
+	}
+	if _, err := r.patchStatus(ctx, exposureBefore, &workload); err != nil {
+		return r.reportFailure(ctx, &workload, err)
+	}
 	desired := workload.DeepCopy()
 	for _, reference := range external {
 		desired.Spec.SecretRefs = append(desired.Spec.SecretRefs, reference.targetSecret)
 	}
 	plan, err := r.Builder.Build(desired)
+	if err == nil && exposure.manageRoute {
+		var route resource.Intent
+		route, err = resource.HTTPRouteIntent(desired)
+		if err == nil {
+			plan = append(plan, route)
+		}
+	}
 	if err == nil {
 		plan, err = ValidatePlan(&workload, plan)
 	}
@@ -129,10 +149,18 @@ func (r *AIWorkloadReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err != nil {
 		return r.reportFailure(ctx, &workload, err)
 	}
+	exposureBefore = workload.DeepCopy()
+	exposureRequeue, err := r.observeExposure(ctx, &workload, exposure)
+	if err != nil {
+		return r.reportFailure(ctx, &workload, err)
+	}
+	if _, err := r.patchStatus(ctx, exposureBefore, &workload); err != nil {
+		return r.reportFailure(ctx, &workload, err)
+	}
 	if err = r.observeAndReportStatus(ctx, &workload); err != nil {
 		return r.reportFailure(ctx, &workload, err)
 	}
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: exposureRequeue}, nil
 }
 
 func externalSecretRevision(references []resolvedExternalSecret) string {
@@ -222,6 +250,8 @@ func childKind(object client.Object) string {
 		return "Service"
 	case 3:
 		return "NetworkPolicy"
+	case 4:
+		return "HTTPRoute"
 	default:
 		return "Unknown"
 	}

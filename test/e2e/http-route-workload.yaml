@@ -1,0 +1,17 @@
+apiVersion: platform.example.io/v1alpha1
+kind: AIWorkload
+metadata:
+  name: http-route-exposure
+  namespace: awcp-workloads
+spec:
+  image: awcp-demo:v1
+  container:
+    port: 8080
+  network:
+    enabled: false
+  exposure:
+    mode: HTTPRoute
+    gateway: awcp-e2e-gateway
+    sectionName: http
+    hostname: route.awcp.test
+    path: /version

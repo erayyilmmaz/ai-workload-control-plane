@@ -29,6 +29,8 @@ grep -Fq 'kind: ValidatingAdmissionPolicyBinding' gitops/platform/base/project.y
 grep -Fq 'group: external-secrets.io' gitops/platform/base/project.yaml
 grep -Fq 'kind: SecretStore' gitops/platform/base/project.yaml
 grep -Fq 'kind: ExternalSecret' gitops/platform/base/project.yaml
+grep -Fq 'group: gateway.networking.k8s.io' gitops/platform/base/project.yaml
+grep -Fq 'kind: HTTPRoute' gitops/platform/base/project.yaml
 ! rg -n '^kind: ClusterRole$|^kind: ClusterRoleBinding$' config/tenancy
 applications="$($kustomize build gitops/argocd/applications)"
 printf '%s\n' "$applications" | grep -Fq 'name: awcp-platform'

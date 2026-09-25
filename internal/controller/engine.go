@@ -13,6 +13,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -43,7 +44,7 @@ type Engine struct {
 }
 
 func childOrder(o client.Object) int {
-	switch o.(type) {
+	switch object := o.(type) {
 	case *corev1.ServiceAccount:
 		return 0
 	case *appsv1.Deployment:
@@ -52,6 +53,11 @@ func childOrder(o client.Object) int {
 		return 2
 	case *networkingv1.NetworkPolicy:
 		return 3
+	case *unstructured.Unstructured:
+		if object.GroupVersionKind() == resource.HTTPRouteGVK {
+			return 4
+		}
+		return -1
 	default:
 		return -1
 	}

@@ -95,20 +95,22 @@ func TestMetricsAuthenticationRBACAndService(t *testing.T) {
 func TestGeneratedRBACAndCRD(t *testing.T) {
 	var role rbacv1.Role
 	readYAML(t, "config/rbac/role.yaml", &role)
-	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 10 {
+	if role.Kind != "Role" || role.Namespace != "awcp-workloads" || len(role.Rules) != 12 {
 		t.Fatalf("unexpected runtime role: %+v", role)
 	}
 	want := map[string]string{
 		"/configmaps": "get",
 		"/secrets":    "get,list,watch",
 		"external-secrets.io/externalsecrets,secretstores": "get",
-		"/serviceaccounts":                       "create,get,list,patch,update,watch",
-		"/services":                              "create,delete,get,list,patch,update,watch",
-		"apps/deployments":                       "create,get,list,patch,update,watch",
-		"networking.k8s.io/networkpolicies":      "create,delete,get,list,patch,update,watch",
-		"events.k8s.io/events":                   "create,patch,update",
-		"platform.example.io/aiworkloads":        "get,list,watch",
-		"platform.example.io/aiworkloads/status": "patch,update",
+		"gateway.networking.k8s.io/gateways":               "get",
+		"gateway.networking.k8s.io/httproutes":             "create,delete,get,list,patch,watch",
+		"/serviceaccounts":                                 "create,get,list,patch,update,watch",
+		"/services":                                        "create,delete,get,list,patch,update,watch",
+		"apps/deployments":                                 "create,get,list,patch,update,watch",
+		"networking.k8s.io/networkpolicies":                "create,delete,get,list,patch,update,watch",
+		"events.k8s.io/events":                             "create,patch,update",
+		"platform.example.io/aiworkloads":                  "get,list,watch",
+		"platform.example.io/aiworkloads/status":           "patch,update",
 	}
 	for _, rule := range role.Rules {
 		key := strings.Join(rule.APIGroups, ",") + "/" + strings.Join(rule.Resources, ",")

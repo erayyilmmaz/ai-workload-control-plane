@@ -88,6 +88,12 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 		message = externalSecretErr.message
 		permanent = true
 	}
+	var exposureErr exposureConfigurationError
+	if errors.As(cause, &exposureErr) {
+		reason = exposureErr.reason
+		message = exposureErr.message
+		permanent = true
+	}
 	if apierrors.IsForbidden(cause) && strings.Contains(strings.ToLower(cause.Error()), "exceeded quota") {
 		reason = "QuotaExceeded"
 		message = "Tenant quota blocked an AWCP child; reduce requested resources or ask a platform administrator to adjust the tenant profile."
@@ -113,6 +119,9 @@ func (r *AIWorkloadReconciler) reportFailure(ctx context.Context, p *platformv1a
 	}
 	if errors.As(cause, &externalSecretErr) {
 		meta.SetStatusCondition(&p.Status.Conditions, metav1.Condition{Type: conditionExternalSecretsReady, Status: metav1.ConditionFalse, Reason: reason, Message: message, ObservedGeneration: p.Generation})
+	}
+	if errors.As(cause, &exposureErr) {
+		meta.SetStatusCondition(&p.Status.Conditions, metav1.Condition{Type: conditionExposureReady, Status: metav1.ConditionFalse, Reason: reason, Message: message, ObservedGeneration: p.Generation})
 	}
 	p.Status.ObservedGeneration = p.Generation
 	p.Status.DesiredReplicas = desiredReplicas(p)
@@ -166,7 +175,7 @@ func (r *AIWorkloadReconciler) patchStatus(ctx context.Context, before, after *p
 func preserveUnmanagedConditions(desired, current []metav1.Condition) []metav1.Condition {
 	result := append([]metav1.Condition(nil), desired...)
 	for _, condition := range current {
-		if condition.Type == conditionReady || condition.Type == conditionProgressing || condition.Type == conditionDegraded || condition.Type == conditionTenantReady || condition.Type == conditionExternalSecretsReady {
+		if condition.Type == conditionReady || condition.Type == conditionProgressing || condition.Type == conditionDegraded || condition.Type == conditionTenantReady || condition.Type == conditionExternalSecretsReady || condition.Type == conditionExposureReady {
 			continue
 		}
 		if meta.FindStatusCondition(result, condition.Type) == nil {

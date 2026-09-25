@@ -41,7 +41,7 @@ only in their owning story after schema, builder, status and lifecycle tests exi
 | `spec.environment` | AWCP-21 | Implemented optional logical environment identity; it labels AWCP-owned children and never selects a namespace or cluster | Existing namespace/manifest behavior is unchanged |
 | `spec.tenant` | AWCP-23 | Implemented optional tenant identity; it must match the namespace-local GitOps tenant profile before AWCP creates children | Omission preserves V0 behavior and does not read a tenant profile |
 | `spec.autoscaling` | AWCP-27 | HPA intent, min/max/metrics/behavior | `replicas` remains controller-owned as in V0 |
-| `spec.exposure` | AWCP-26 | ClusterLocal or external HTTPRoute intent | Existing ClusterIP Service behavior is unchanged |
+| `spec.exposure` | AWCP-26 | Implemented `ClusterLocal` or namespace-local HTTPRoute intent with exact Gateway listener/hostname/path | Existing ClusterIP Service behavior is unchanged |
 | `spec.delivery` | AWCP-29 | Rolling, Canary or BlueGreen rollout intent | Existing Deployment rolling update is retained |
 | `spec.externalSecrets` | AWCP-25 | Implemented namespace-local `{externalSecret,targetSecret}` ESO references without values; only Ready SecretStore/ExternalSecret targets are consumed | Existing direct `secretRefs` semantics are retained |
 | `spec.availability` | AWCP-28 | Workload PDB intent | No PDB is created |
@@ -95,7 +95,7 @@ still starts and continues reconciling V0 workloads.
 | Dependency | Capability decision | Missing behavior |
 | --- | --- | --- |
 | Argo CD | GitOps delivery dependency, not an AWCP runtime API dependency | AWCP still reconciles a CR delivered by another mechanism; AWCP-20 owns GitOps demo/status integration |
-| Gateway API | Discover `Gateway` and `HTTPRoute` v1 APIs when `exposure` is requested | Do not create a route; report actionable dependency failure |
+| Gateway API | Discover namespace-local `Gateway` and `HTTPRoute` v1 APIs when HTTPRoute exposure is requested | Require Programmed Gateway; report actionable dependency failure without a route or Gateway write |
 | External Secrets Operator | Discover namespaced `SecretStore` and `ExternalSecret` v1 APIs when requested | Do not read/provider-fetch a Secret; report actionable dependency failure |
 | Argo Rollouts | Discover `Rollout` when Canary/BlueGreen is requested | Preserve/follow declared Rolling fallback policy; do not create both a Deployment and Rollout |
 | HPA external metrics | Discover external metrics API only when external metric or scale-to-zero is requested | HPA feature reports unavailable; ordinary static replicas continue |
@@ -113,7 +113,7 @@ publication.
 | --- | --- | --- | --- |
 | V0 AIWorkload API | Real envtest and kind evidence on Kubernetes 1.36.x | Existing pinned 1.36.2 envtest / 1.36.4 kind node | The only runtime baseline proven by this story |
 | ValidatingAdmissionPolicy | Design and manifest compatibility decision | Kubernetes 1.30+; stable API | AWCP-24 installs/tests policy later |
-| Gateway API HTTPRoute | Design only | Gateway API v1 CRDs plus a platform Gateway implementation | AWCP-26 owns route implementation and traffic proof |
+| Gateway API HTTPRoute | Namespace-local HTTPRoute and kind traffic proof | Gateway API v1 CRDs plus a platform Gateway implementation | AWCP-26 proves HTTP traffic routing only; DNS, TLS and data-plane NetworkPolicy remain external |
 | External Secrets | Namespaced ESO v1 contract and kind proof | ESO v2.11.0 test install; Ready SecretStore/ExternalSecret and target Secret metadata | AWCP-25 proves target rotation rollout, not provider credential validity |
 | Argo Rollouts | Design only | Rollouts CRD/controller | AWCP-29 owns progressive delivery proof |
 | HPA scale-to-zero | Design only | Kubernetes 1.37+, object or external metric; 1.36 baseline cannot claim it | AWCP-27 owns rebaseline and E2E proof |
