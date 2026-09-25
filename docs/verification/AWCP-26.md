@@ -30,3 +30,11 @@ controller failure: Envoy Gateway's default `LoadBalancer` Service cannot receiv
 an address on plain kind, so the Gateway stayed `Programmed=False`. The E2E fixture
 now uses the documented EnvoyProxy `ClusterIP` Service override and re-runs the
 same Gateway/route/traffic proof.
+
+## Hosted evidence
+
+[GitHub Actions run 36112989601](https://github.com/erayyilmmaz/ai-workload-control-plane/actions/runs/36112989601)
+passed all 12 jobs for commit `e9d706e`. Its Linux AMD64 kind E2E completed the
+Gateway `Programmed` check, AWCP-owned HTTPRoute `Accepted`/`ResolvedRefs` checks,
+Host-header traffic through the Envoy Service, and guarded HTTPRoute garbage
+collection while the platform Gateway remained present.
